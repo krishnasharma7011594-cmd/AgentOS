@@ -78,3 +78,14 @@ class ValidationError(AgentOSError):
     """Raised when a TaskResult fails structural or semantic validation."""
 
     pass
+
+
+class ToolNotFoundError(AgentOSError):
+    """Raised by ToolRegistry when a requested tool name is not registered."""
+
+    def __init__(self, tool_name: str):
+        super().__init__(
+            message=f"Tool not found: '{tool_name}'",
+            details=f"No tool named '{tool_name}' has been registered in the ToolRegistry.",
+        )
+        self.tool_name = tool_name

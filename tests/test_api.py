@@ -42,4 +42,4 @@ def test_chat_endpoint_flow(client_with_mock_orchestrator):
     assert data["status"] == "success"
     assert "Mocked LLM answer" in data["response"]
     assert len(data["tasks"]) == 1
-    assert data["tasks"][0]["agent_id"] == "ResearchAgent"
+    assert data["tasks"][0]["agent_id"].startswith("ResearchAgent")

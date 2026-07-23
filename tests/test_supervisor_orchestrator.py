@@ -49,4 +49,4 @@ async def test_supervisor_orchestrator_end_to_end() -> None:
     assert result.status == "success"
     assert "LangGraph" in result.response
     assert len(result.tasks) == 1
-    assert result.tasks[0].agent_id == "ResearchAgent"
+    assert result.tasks[0].agent_id.startswith("ResearchAgent")

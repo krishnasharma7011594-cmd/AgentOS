@@ -46,3 +46,21 @@ class BaseLLMProvider(ABC):
     ) -> AsyncIterator[str]:
         """Generates a streaming completion iterator."""
         pass
+
+    async def complete(
+        self,
+        messages: List[Message],
+        temperature: float = 0.7,
+        max_tokens: Optional[int] = None,
+        **kwargs: Any,
+    ) -> str:
+        """
+        Convenience wrapper around generate_response returning text string content directly.
+        """
+        res = await self.generate_response(
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            **kwargs,
+        )
+        return res.content

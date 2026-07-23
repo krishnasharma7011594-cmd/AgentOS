@@ -4,6 +4,10 @@ Core Domain Models
 Defines the foundational domain entities and data schemas for AgentOS using Pydantic.
 Ensures strong typing, serialization, and schema validation across all application layers.
 
+Phase 3 adds ReAct lifecycle models: ToolCall, ToolResult, Observation, ReasoningStep.
+These are shared across all agents so the same reasoning primitives work for Research,
+Coding, GitHub, Finance, and any future agent.
+
 Architecture Layer: Core / Models
 """
 
@@ -183,3 +187,101 @@ class ExecutionResult(BaseModel):
     response: str = Field(..., description="Synthesized final response text")
     tasks: List[TaskResult] = Field(default_factory=list)
     completed_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Phase 3 — ReAct Lifecycle Models
+# ---------------------------------------------------------------------------
+# These four models represent one complete iteration of the ReAct loop:
+#   ToolCall → agent decides WHAT to call and with WHAT parameters.
+#   ToolResult → raw output returned by the tool after execution.
+#   Observation → agent's contextual interpretation of a ToolResult.
+#   ReasoningStep → one complete Think → Act → Observe record.
+#
+# Keeping them in domain.py means every layer (agents, supervisor, observability)
+# can import them without creating circular dependencies.
+# ---------------------------------------------------------------------------
+
+
+class ToolCall(BaseModel):
+    """
+    Represents the agent's intent to invoke a tool.
+
+    Generated during the 'Act' phase of the ReAct loop after the LLM has
+    selected a tool and constructed its input parameters.
+
+    Attributes:
+        call_id: Unique ID for correlating calls with results.
+        tool_name: Registry name of the tool to invoke.
+        parameters: Key-value arguments to pass to the tool.
+    """
+
+    call_id: str = Field(default_factory=generate_uuid)
+    tool_name: str = Field(..., description="Name of the tool to execute")
+    parameters: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ToolResult(BaseModel):
+    """
+    Raw output returned by a tool after execution.
+
+    Produced by ToolRegistry.execute() and passed back to the ReAct loop
+    to be wrapped into an Observation.
+
+    Attributes:
+        call_id: Correlates to the originating ToolCall.
+        tool_name: Name of the tool that produced this result.
+        output: String representation of the tool's output.
+        error: Non-None when execution raised an exception.
+        success: False when tool raised an error.
+    """
+
+    call_id: str = Field(..., description="Matches originating ToolCall.call_id")
+    tool_name: str = Field(..., description="Name of the tool that ran")
+    output: str = Field(..., description="String output from tool execution")
+    error: Optional[str] = Field(default=None, description="Error message on failure")
+    success: bool = Field(default=True, description="False when execution failed")
+
+
+class Observation(BaseModel):
+    """
+    The agent's contextual record of a tool execution result.
+
+    Inserted into the ReAct prompt history so subsequent reasoning steps
+    can reference what the tool returned.
+
+    Attributes:
+        step: Index of the reasoning loop iteration (1-based).
+        tool_result: Underlying ToolResult from the registry.
+        content: Human-readable summary injected into the next prompt.
+    """
+
+    step: int = Field(..., description="Reasoning loop iteration (1-based)")
+    tool_result: ToolResult
+    content: str = Field(..., description="Observation text injected into next reasoning prompt")
+
+
+class ReasoningStep(BaseModel):
+    """
+    A complete record of one ReAct iteration: Thought → Action → Observation.
+
+    ReasoningSteps are accumulated in a list throughout the agent lifecycle
+    and surfaced in TaskResult.metadata for full traceability.
+
+    Attributes:
+        step: 1-based iteration index.
+        thought: LLM's internal reasoning text.
+        action: Name of the chosen tool (None if final answer step).
+        action_input: Parameters passed to the tool.
+        observation: Tool result summary (None on final answer steps).
+        is_final: True when the LLM produced a Final Answer instead of an action.
+        final_answer: Populated only when is_final=True.
+    """
+
+    step: int = Field(..., description="Iteration index (1-based)")
+    thought: str = Field(..., description="LLM reasoning text for this step")
+    action: Optional[str] = Field(default=None, description="Tool name selected, if any")
+    action_input: Optional[Dict[str, Any]] = Field(default=None)
+    observation: Optional[str] = Field(default=None, description="Observation from tool result")
+    is_final: bool = Field(default=False, description="True when this step produces the answer")
+    final_answer: Optional[str] = Field(default=None, description="Answer text when is_final=True")

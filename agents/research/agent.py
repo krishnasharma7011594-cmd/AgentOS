@@ -1,37 +1,58 @@
 """
-Research Agent Implementation
+Research Agent — Phase 3 Implementation
 
-Specialized agent responsible for researching topics, summarizing information, and
-explaining technical concepts using an injected LLM provider.
+The Research Agent is the first true tool-using agent in AgentOS.
+
+Phase 2 had a simple LLM wrapper that answered from training data alone.
+Phase 3 elevates it into a full ReAct agent:
+  - It registers the WebSearchTool into a ToolRegistry at startup.
+  - It delegates all reasoning to ReactReasoner via AgentLifecycle.
+  - It can search the web, observe results, and reason across multiple steps
+    before producing a final answer.
+
+The agent itself owns very little logic — that's intentional. The lifecycle
+(AgentLifecycle) owns orchestration; the reasoner (ReactReasoner) owns the
+ReAct loop; the tool (WebSearchTool) owns search. ResearchAgent only declares:
+  1. What capabilities it exposes to the Supervisor
+  2. What tools it needs at runtime
+  3. What extra context helps the LLM be a better researcher
 
 Architecture Layer: Agents / Research
 """
 
 from typing import List, Optional
 
-from agents.base import BaseAgent
-from agents.research.config import ResearchAgentConfig
-from agents.research.memory import ResearchAgentMemory
+from agents.lifecycle import AgentLifecycle
+from agents.research.prompts_v1 import CAPABILITY_TEMPLATES, SYSTEM_CONTEXT
 from core.ai.providers.base import BaseLLMProvider
-from core.exceptions.base import LLMProviderError
 from core.logging.logger import logger
-from core.models.domain import AgentCapability, Message, RoleEnum, Task, TaskResult, TaskStatus
-from core.utils.helpers import generate_uuid
+from core.models.domain import AgentCapability, Task, TaskResult
+from core.tools.implementations.web_search import WebSearchTool
+from core.tools.registry import ToolRegistry
 
 
-class ResearchAgent(BaseAgent):
+class ResearchAgent(AgentLifecycle):
     """
-    Autonomous agent specialized in research and summarization tasks.
+    Autonomous agent specialised in research, documentation lookup, and summarization.
 
-    Receives tasks assigned by SupervisorRouter, constructs prompts, invokes the injected
-    BaseLLMProvider, and packages the LLM completion into a TaskResult.
+    Registered Capabilities:
+        web_research          — research topics using live web search
+        documentation_lookup  — explain technical concepts and docs
+        summarization         — condense provided information
+
+    Tools Used:
+        web_search (WebSearchTool via ToolRegistry)
+
+    Prompt Version: v1 (agents/research/prompts_v1.py)
+    Lifecycle: ReAct via AgentLifecycle → ReactReasoner
     """
 
-    # Capabilities declared to CapabilityRegistry at startup
+    # Capabilities declared to CapabilityRegistry at startup.
+    # The Supervisor's Router uses these to match incoming tasks.
     CAPABILITIES: List[AgentCapability] = [
         AgentCapability(
             name="web_research",
-            description="Research topics and return structured summaries using LLM knowledge.",
+            description="Research topics and return structured summaries using web search and LLM.",
         ),
         AgentCapability(
             name="documentation_lookup",
@@ -46,138 +67,84 @@ class ResearchAgent(BaseAgent):
     def __init__(
         self,
         llm_provider: Optional[BaseLLMProvider] = None,
-        config: Optional[ResearchAgentConfig] = None,
-    ):
-        """
-        Initializes ResearchAgent with injected dependencies.
-
-        Args:
-            llm_provider: Injected LLM provider implementation.
-            config: Agent configuration settings.
-        """
-        cfg = config or ResearchAgentConfig()
-        memory = ResearchAgentMemory()
+        tool_registry: Optional[ToolRegistry] = None,
+    ) -> None:
         super().__init__(
-            name=cfg.agent_name,
-            description="Specialized agent for research, documentation lookup, and summarization.",
+            name="ResearchAgent",
+            description="Autonomous agent specialised in web research and summarization.",
             llm_provider=llm_provider,
             capabilities=self.CAPABILITIES,
-            memory=memory,
+            tool_registry=tool_registry,
         )
-        self.config = cfg
+        logger.info("research_agent_init", agent_id=self.agent_id)
 
-    async def initialize(self) -> None:
-        """Startup lifecycle hook."""
-        logger.info("ResearchAgent: initialized", agent=self.name)
+    # ------------------------------------------------------------------
+    # AgentLifecycle Hooks
+    # ------------------------------------------------------------------
+
+    def _setup_tools(self) -> None:
+        """
+        Register the WebSearchTool.
+
+        Called by AgentLifecycle before each ReAct run.
+        Registering on every call is intentional — it is idempotent
+        (ToolRegistry.register overwrites on duplicate names) and makes the
+        agent safe for hot-reload scenarios in Phase 5+.
+        """
+        self.tool_registry.register(WebSearchTool())
+        logger.debug("research_agent_tools_registered", agent_id=self.agent_id)
+
+    def _extra_context(self) -> Optional[str]:
+        """
+        Inject research-specific guidance into the ReAct user prompt.
+
+        The SYSTEM_CONTEXT from prompts_v1 nudges the LLM toward well-structured,
+        source-citing answers without overriding the generic ReAct system prompt.
+        """
+        return SYSTEM_CONTEXT
+
+    def _max_react_steps(self) -> int:
+        """
+        Research tasks allow up to 3 reasoning cycles.
+
+        This is enough for: look up a topic → observe → synthesise answer.
+        Increase for deeper research workflows in later phases.
+        """
+        return 3
+
+    # ------------------------------------------------------------------
+    # Capability Registration (called by DI container at startup)
+    # ------------------------------------------------------------------
+
+    def get_capabilities(self) -> List[AgentCapability]:
+        """Return declared capabilities for registration in CapabilityRegistry."""
+        return self.CAPABILITIES
+
+    # ------------------------------------------------------------------
+    # Task Execution — delegates to AgentLifecycle
+    # ------------------------------------------------------------------
 
     async def execute_task(self, task: Task) -> TaskResult:
         """
-        Executes an assigned research Task.
+        Execute a research task through the ReAct lifecycle.
 
-        Passes task prompt to the configured LLM provider and returns a structured TaskResult.
-
-        Args:
-            task: Target task definition.
-
-        Returns:
-            TaskResult: Execution outcome payload.
+        Applies the appropriate prompt template based on the task's required
+        capability before delegating to AgentLifecycle.execute_task().
         """
         logger.info(
-            "ResearchAgent: executing task",
-            agent=self.name,
+            "research_agent_task_start",
+            agent_id=self.agent_id,
             task_id=task.id,
-            task_name=task.name,
             capability=task.required_capability,
         )
 
-        if self.llm_provider is None:
-            logger.error("ResearchAgent: no LLM provider configured", agent=self.name)
-            return TaskResult(
-                task_id=task.id,
-                agent_id=self.name,
-                status=TaskStatus.FAILED,
-                summary="",
-                error="No LLM provider configured for ResearchAgent.",
+        # Apply capability-specific prompt template to frame the task correctly
+        template = CAPABILITY_TEMPLATES.get(task.required_capability)
+        if template:
+            # Create a new task with the formatted description
+            task = task.model_copy(
+                update={"description": template.format(description=task.description)}
             )
 
-        try:
-            messages = self._build_messages(task)
-            response = await self.llm_provider.generate_response(
-                messages,
-                temperature=self.config.temperature,
-                max_tokens=self.config.max_tokens,
-            )
-            summary = response.content
-            provider_meta = response.metadata
-
-            logger.info(
-                "ResearchAgent: task completed",
-                task_id=task.id,
-                summary_chars=len(summary),
-            )
-
-            return TaskResult(
-                task_id=task.id,
-                agent_id=self.name,
-                status=TaskStatus.SUCCESS,
-                summary=summary,
-                metadata={
-                    "provider": provider_meta.get("provider", "unknown"),
-                    "model": provider_meta.get("model", "unknown"),
-                    "capability_used": task.required_capability,
-                    "goal_id": task.goal_id,
-                },
-            )
-
-        except LLMProviderError as exc:
-            logger.error(
-                "ResearchAgent: LLM provider error",
-                task_id=task.id,
-                error=str(exc),
-            )
-            return TaskResult(
-                task_id=task.id,
-                agent_id=self.name,
-                status=TaskStatus.FAILED,
-                summary="",
-                error=str(exc),
-            )
-        except Exception as exc:
-            logger.error(
-                "ResearchAgent: unexpected error",
-                task_id=task.id,
-                error=str(exc),
-            )
-            return TaskResult(
-                task_id=task.id,
-                agent_id=self.name,
-                status=TaskStatus.FAILED,
-                summary="",
-                error=f"Unexpected error: {exc}",
-            )
-
-    def _build_messages(self, task: Task) -> List[Message]:
-        """Constructs system and user Message objects for the LLM call."""
-        system_prompt = (
-            "You are a highly skilled Research Agent. "
-            "Your task is to provide a clear, accurate, and well-structured response "
-            "to the research query. Be concise yet comprehensive."
-        )
-        user_prompt = f"{task.description}\n\nQuery: {task.name}"
-
-        return [
-            Message(
-                id=generate_uuid(),
-                role=RoleEnum.SYSTEM,
-                content=system_prompt,
-            ),
-            Message(
-                id=generate_uuid(),
-                role=RoleEnum.USER,
-                content=user_prompt,
-            ),
-        ]
-
-    async def shutdown(self) -> None:
-        """Shutdown lifecycle hook."""
-        logger.info("ResearchAgent: shutting down", agent=self.name)
+        # Delegate to the shared AgentLifecycle ReAct loop
+        return await super().execute_task(task)

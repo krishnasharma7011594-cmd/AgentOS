@@ -13,6 +13,8 @@ from core.ai.providers.factory import build_llm_provider
 from core.config.settings import Settings
 from core.config.settings import settings as _global_settings
 from core.logging.logger import logger
+from core.tools.implementations.web_search import WebSearchTool
+from core.tools.registry import ToolRegistry
 from registry.agent_registry import AgentRegistry
 from registry.capability_registry import CapabilityRegistry
 from supervisor.orchestrator import SupervisorOrchestrator
@@ -25,6 +27,7 @@ from supervisor.validator import SupervisorValidator
 def _register_agents(
     agent_registry: AgentRegistry,
     capability_registry: CapabilityRegistry,
+    tool_registry: ToolRegistry,
     llm_provider: BaseLLMProvider,
 ) -> None:
     """
@@ -35,12 +38,11 @@ def _register_agents(
     importing agent modules directly.
     """
     from agents.research.agent import ResearchAgent
-    from agents.research.config import ResearchAgentConfig
 
-    # ResearchAgent receives its LLM provider via constructor injection
+    # ResearchAgent receives its LLM provider and shared ToolRegistry via constructor injection
     research_agent = ResearchAgent(
         llm_provider=llm_provider,
-        config=ResearchAgentConfig(),
+        tool_registry=tool_registry,
     )
     agent_registry.register_agent(research_agent.name, research_agent)
     capability_registry.register_agent_capabilities(
@@ -79,9 +81,13 @@ def build_orchestrator(app_settings: Settings | None = None) -> SupervisorOrches
     # 2. Initialize registries
     agent_registry = AgentRegistry()
     capability_registry = CapabilityRegistry()
+    tool_registry = ToolRegistry()
+
+    # Register default tools in global ToolRegistry
+    tool_registry.register(WebSearchTool())
 
     # 3. Register active agents
-    _register_agents(agent_registry, capability_registry, llm_provider)
+    _register_agents(agent_registry, capability_registry, tool_registry, llm_provider)
 
     # 4. Instantiate supervisor subcomponents
     planner = SupervisorPlanner()
@@ -107,5 +113,6 @@ def build_orchestrator(app_settings: Settings | None = None) -> SupervisorOrches
         provider=cfg.llm.default_provider,
         agents=agent_registry.list_agents(),
         capabilities=capability_registry.list_capabilities(),
+        tools=[t.name for t in tool_registry.list_tools()],
     )
     return orchestrator
