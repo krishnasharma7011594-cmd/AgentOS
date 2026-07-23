@@ -59,12 +59,7 @@ class WebSearchTool(BaseTool):
             },
         )
 
-    async def execute(
-        self,
-        query: str,
-        max_results: int = DEFAULT_MAX_RESULTS,
-        **kwargs: Any,
-    ) -> str:
+    async def execute(self, **kwargs: Any) -> str:
         """
         Perform a DuckDuckGo text search and return a formatted result string.
 
@@ -78,6 +73,10 @@ class WebSearchTool(BaseTool):
         Returns:
             Multi-line string of search results, or an error description.
         """
+        query: str = str(kwargs.get("query", ""))
+        raw_max = kwargs.get("max_results", self.DEFAULT_MAX_RESULTS)
+        max_results: int = int(raw_max) if raw_max is not None else self.DEFAULT_MAX_RESULTS
+
         # Clamp to the hard ceiling regardless of caller input
         max_results = min(max_results, self.MAX_ALLOWED_RESULTS)
 
@@ -86,7 +85,7 @@ class WebSearchTool(BaseTool):
         try:
             # Import lazily so environments without the package can still boot;
             # the tool will just return an error string rather than crashing startup.
-            from duckduckgo_search import DDGS  # type: ignore[import-untyped]
+            from duckduckgo_search import DDGS
 
             raw_results: List[Any] = []
             # DDGS is synchronous; we keep I/O minimal to avoid blocking the loop
