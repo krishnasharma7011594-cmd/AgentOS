@@ -8,7 +8,10 @@ AgentOS is a production-grade, highly modular, clean-architecture framework desi
 
 ## 🌟 Architecture Overview
 
-AgentOS strictly enforces **SOLID principles** and **Clean Architecture**. Dependencies flow unidirectionally downward:
+AgentOS strictly enforces **SOLID principles** and **Clean Architecture**. Dependencies flow unidirectionally downward.
+
+### 1. Structural & Dependency Architecture
+This diagram illustrates how the system's core components are decoupled through dependency injection, abstract interfaces, and registries.
 
 ```
                   [ User / Client ]
@@ -37,6 +40,53 @@ AgentOS strictly enforces **SOLID principles** and **Clean Architecture**. Depen
             ┌────────────┴────────────┐
             ▼                         ▼
     [ GeminiProvider ]        [ GroqProvider ]
+```
+
+### 2. Execution & Data Flow Lifecycle
+This diagram details the chronological journey of a user request as it flows through the Supervisor, ExecutionGraph, and Agents.
+
+```
+                         User
+                          │
+                          ▼
+                     FastAPI API
+                          │
+                          ▼
+                Supervisor Orchestrator
+                          │
+                          ▼
+                 Supervisor Planner
+                          │
+                          ▼
+                 Plan Validation
+                          │
+                          ▼
+                  ExecutionGraph
+                          │
+          ┌───────────────┴───────────────┐
+          ▼                               ▼
+   Research Agent                  Coding Agent
+          │                               │
+          ▼                               ▼
+      ReAct Loop                     ReAct Loop
+          │                               │
+          ▼                               ▼
+     Tool Registry                   Tool Registry
+          │                               │
+          ▼                               ▼
+      Web Search                     Future Tools
+          │                               │
+          └───────────────┬───────────────┘
+                          ▼
+                  ExecutionContext
+                          ▼
+                  MetricsCollector
+                          ▼
+                   ReportBuilder
+                          ▼
+                   ExecutionResult
+                          ▼
+                         User
 ```
 
 ### Key Architectural Safeguards
