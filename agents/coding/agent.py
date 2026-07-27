@@ -44,8 +44,7 @@ class CodingAgent(AgentLifecycle):
         super().__init__(
             name="CodingAgent",
             description=(
-                "Specialized agent for code generation, "
-                "software design, debugging, and testing."
+                "Specialized agent for code generation, " "software design, debugging, and testing."
             ),
             llm_provider=llm_provider,
             capabilities=self.CAPABILITIES,
