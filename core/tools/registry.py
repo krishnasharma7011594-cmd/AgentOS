@@ -11,6 +11,10 @@ Phase 3 extensions:
   - get_tool_descriptions(): formatted string injected into ReAct system prompts
   - get_tool(): raises ToolNotFoundError instead of returning None
 
+Phase 4.5 extensions:
+  - list_tool_metadata(): returns ToolMetadata for all registered tools
+  - get_tool_metadata(): returns ToolMetadata for a specific tool
+
 Architecture Layer: Core / Tools
 """
 
@@ -18,7 +22,7 @@ from typing import Any, Dict, List, Optional
 
 from core.exceptions.base import ToolNotFoundError
 from core.logging.logger import logger
-from core.models.domain import ToolCall, ToolResult
+from core.models.domain import ToolCall, ToolMetadata, ToolResult
 from core.tools.base import BaseTool, ToolSchema
 
 
@@ -29,6 +33,9 @@ class ToolRegistry:
     The registry is the single point of truth for what tools are available to
     an agent at runtime. Agents receive a reference to this registry via DI
     and never instantiate tools themselves.
+
+    Phase 4.5: The registry is now metadata-driven. Callers can inspect tool
+    metadata without needing references to concrete tool classes.
     """
 
     def __init__(self) -> None:
@@ -76,6 +83,35 @@ class ToolRegistry:
     def list_schemas(self) -> List[ToolSchema]:
         """Return all tool schemas (metadata only, no callable references)."""
         return [tool.schema for tool in self._tools.values()]
+
+    def list_tool_metadata(self) -> List[ToolMetadata]:
+        """
+        Return ToolMetadata for all registered tools.
+
+        Falls back gracefully when a tool has not yet declared METADATA.
+        """
+        metadata: List[ToolMetadata] = []
+        for tool in self._tools.values():
+            if hasattr(tool, "METADATA") and isinstance(tool.METADATA, ToolMetadata):
+                metadata.append(tool.METADATA)
+            else:
+                # Fallback: construct minimal metadata from ToolSchema
+                metadata.append(
+                    ToolMetadata(
+                        name=tool.name,
+                        description=tool.description,
+                    )
+                )
+        return metadata
+
+    def get_tool_metadata(self, tool_name: str) -> Optional[ToolMetadata]:
+        """Return ToolMetadata for a specific tool, or None if not registered."""
+        tool = self._tools.get(tool_name)
+        if tool is None:
+            return None
+        if hasattr(tool, "METADATA") and isinstance(tool.METADATA, ToolMetadata):
+            return tool.METADATA
+        return ToolMetadata(name=tool.name, description=tool.description)
 
     def get_tool_descriptions(self) -> str:
         """

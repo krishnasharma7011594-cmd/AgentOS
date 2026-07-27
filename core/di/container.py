@@ -5,6 +5,9 @@ Wires component dependencies for AgentOS at application startup.
 Initializes registries, instantiates agents, configures LLM providers, and binds
 the decomposed Supervisor subcomponents into a unified SupervisorOrchestrator.
 
+Phase 4.5: Registers AgentMetadata alongside agents; passes CapabilityRegistry
+to SupervisorValidator for plan-level capability checking.
+
 Architecture Layer: Core / DI
 """
 
@@ -31,16 +34,19 @@ def _register_agents(
     llm_provider: BaseLLMProvider,
 ) -> None:
     """
-    Instantiates agents and registers their capabilities.
+    Instantiates agents and registers them with their capabilities and metadata.
 
-    Agents self-register their functional capabilities into CapabilityRegistry during startup.
-    This enables dynamic routing: the Supervisor discovers agents by capability rather than
-    importing agent modules directly.
+    Agents self-register their functional capabilities into CapabilityRegistry during
+    startup. This enables dynamic routing: the Supervisor discovers agents by capability
+    rather than importing agent modules directly.
+
+    Phase 4.5: AgentRegistry.register_agent() auto-extracts METADATA from agent
+    class variables — no extra registration step needed.
     """
     from agents.coding.agent import CodingAgent
     from agents.research.agent import ResearchAgent
 
-    # ResearchAgent receives its LLM provider and shared ToolRegistry via constructor injection
+    # ResearchAgent
     research_agent = ResearchAgent(
         llm_provider=llm_provider,
         tool_registry=tool_registry,
@@ -55,6 +61,7 @@ def _register_agents(
         capabilities=[c.name for c in research_agent.capabilities],
     )
 
+    # CodingAgent
     coding_agent = CodingAgent(
         llm_provider=llm_provider,
         tool_registry=tool_registry,
@@ -76,9 +83,9 @@ def build_orchestrator(app_settings: Settings | None = None) -> SupervisorOrches
     """
     Constructs and wires the complete AgentOS runtime component graph.
 
-    Instantiates the configured LLM provider, registries, agents, and decomposed supervisor
-    services (Planner, Router, Validator, ReportGenerator) before binding them into the
-    SupervisorOrchestrator.
+    Instantiates the configured LLM provider, registries, agents, and decomposed
+    supervisor services (Planner, Router, Validator, ReportGenerator) before
+    binding them into the SupervisorOrchestrator.
 
     Args:
         app_settings: Optional Settings object override.
@@ -101,16 +108,17 @@ def build_orchestrator(app_settings: Settings | None = None) -> SupervisorOrches
     # Register default tools in global ToolRegistry
     tool_registry.register(WebSearchTool())
 
-    # 3. Register active agents
+    # 3. Register active agents (auto-registers metadata from METADATA ClassVar)
     _register_agents(agent_registry, capability_registry, tool_registry, llm_provider)
 
     # 4. Instantiate supervisor subcomponents
+    # Validator receives CapabilityRegistry for plan-level capability checking
     planner = SupervisorPlanner()
     router = SupervisorRouter(
         agent_registry=agent_registry,
         capability_registry=capability_registry,
     )
-    validator = SupervisorValidator()
+    validator = SupervisorValidator(capability_registry=capability_registry)
     report_generator = SupervisorReportGenerator()
 
     # 5. Assemble orchestrator

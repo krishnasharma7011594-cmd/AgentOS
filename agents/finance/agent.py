@@ -1,15 +1,42 @@
 """FinanceAgent implementation skeleton."""
 
-from typing import Optional
+from typing import ClassVar, Optional
 
 from agents.base import BaseAgent
 from agents.finance.config import FinanceAgentConfig
 from agents.finance.memory import FinanceAgentMemory
-from core.models.domain import AgentCapability, ExecutionContext, Task, TaskResult, TaskStatus
+from core.models.domain import (
+    AgentMetadata,
+    Capability,
+    ExecutionContext,
+    Task,
+    TaskResult,
+    TaskStatus,
+)
 
 
 class FinanceAgent(BaseAgent):
     """Finance Agent skeleton."""
+
+    METADATA: ClassVar[AgentMetadata] = AgentMetadata(
+        name="FinanceAgent",
+        description=(
+            "Specialized agent for financial data processing, market analysis, and reporting."
+        ),
+        version="1.0",
+        author="AgentOS",
+        capabilities=[
+            Capability(
+                name="market_analysis",
+                description="Analyze market trends and stock indicators",
+            ),
+            Capability(
+                name="financial_reporting",
+                description="Generate financial summary reports",
+            ),
+        ],
+        supported_tools=[],
+    )
 
     def __init__(self, config: FinanceAgentConfig | None = None):
         cfg = config or FinanceAgentConfig()
@@ -19,11 +46,11 @@ class FinanceAgent(BaseAgent):
                 "Specialized agent for financial data processing, market analysis, and reporting."
             ),
             capabilities=[
-                AgentCapability(
+                Capability(
                     name="market_analysis",
                     description="Analyze market trends and stock indicators",
                 ),
-                AgentCapability(
+                Capability(
                     name="financial_reporting",
                     description="Generate financial summary reports",
                 ),

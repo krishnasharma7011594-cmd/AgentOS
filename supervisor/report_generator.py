@@ -4,24 +4,32 @@ Supervisor Report Generator
 Synthesizes validated TaskResult outputs into a cohesive ExecutionResult payload
 returned to the calling client.
 
+Phase 4.5: Delegates report assembly to ReportBuilder and populates
+ExecutionResult.report with the rich ExecutionReport for structured consumers.
+
 Architecture Layer: Supervisor / ReportGenerator
 """
 
 from typing import List
 
+from core.execution.report import ReportBuilder
 from core.logging.logger import logger
-from core.models.domain import ExecutionResult, Goal, TaskResult, TaskStatus, ValidationResult
+from core.models.domain import (
+    ExecutionMetrics,
+    ExecutionResult,
+    Goal,
+    TaskResult,
+    ValidationResult,
+)
 
 
 class SupervisorReportGenerator:
     """
     Supervisor subcomponent owning final output synthesis.
 
-    Aggregates task outputs, determines overall execution status (success, partial, failed),
-    and formats the final textual response.
-
-    Does NOT execute tasks or interact with providers directly.
-    TODO: Add multi-task formatting and markdown report templates in Phase 3.
+    Phase 4.5: Delegates to ReportBuilder for structured report assembly.
+    Returns a backward-compatible ExecutionResult enriched with an optional
+    ExecutionReport in the .report field.
     """
 
     async def generate_report(
@@ -29,17 +37,19 @@ class SupervisorReportGenerator:
         goal: Goal,
         results: List[TaskResult],
         validations: List[ValidationResult],
+        metrics: ExecutionMetrics | None = None,
     ) -> ExecutionResult:
         """
-        Synthesizes task outputs into a unified ExecutionResult object.
+        Synthesize task outputs into a unified ExecutionResult.
 
         Args:
-            goal: Original Goal entity.
-            results: List of completed TaskResult objects.
+            goal:        Original Goal entity.
+            results:     List of completed TaskResult objects.
             validations: List of ValidationResult objects.
+            metrics:     Optional ExecutionMetrics collected during execution.
 
         Returns:
-            ExecutionResult: Aggregated result payload returned to caller.
+            ExecutionResult: Backward-compatible result enriched with ExecutionReport.
         """
         logger.info(
             "ReportGenerator: generating report",
@@ -47,41 +57,27 @@ class SupervisorReportGenerator:
             result_count=len(results),
         )
 
-        successful = [r for r in results if r.status == TaskStatus.SUCCESS]
-        failed = [r for r in results if r.status == TaskStatus.FAILED]
+        # Build the rich structured report
+        builder = (
+            ReportBuilder(goal).add_results(results).set_metrics(metrics or ExecutionMetrics())
+        )
+        report = builder.build()
 
-        # Determine overall execution status across tasks
-        if len(successful) == len(results) and results:
-            overall_status = "success"
-        elif successful:
-            overall_status = "partial"
-        else:
-            overall_status = "failed"
-
-        # Build response text from task summaries
-        if successful:
-            if len(successful) == 1:
-                response_text = successful[0].summary
-            else:
-                parts = []
-                for idx, r in enumerate(successful, 1):
-                    parts.append(f"### Part {idx} by {r.agent_id}\n{r.summary}")
-                response_text = "\n\n".join(parts)
-        else:
-            errors = "; ".join(r.error or "unknown error" for r in failed)
-            response_text = f"The request could not be completed. Errors encountered: {errors}"
-
-        report = ExecutionResult(
+        execution_result = ExecutionResult(
             goal_id=goal.id,
-            status=overall_status,
-            response=response_text,
+            status=report.overall_status,
+            response=report.final_response,
             tasks=results,
+            report=report,
         )
 
         logger.info(
             "ReportGenerator: report generated",
             goal_id=goal.id,
-            status=overall_status,
-            response_chars=len(response_text),
+            status=report.overall_status,
+            completed=report.metrics.completed_tasks,
+            failed=report.metrics.failed_tasks,
+            skipped=report.metrics.skipped_tasks,
+            response_chars=len(report.final_response),
         )
-        return report
+        return execution_result

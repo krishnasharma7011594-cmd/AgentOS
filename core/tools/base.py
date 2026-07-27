@@ -1,13 +1,15 @@
 """Base tool interface for AgentOS."""
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict
+from typing import Any, ClassVar, Dict, Optional
 
 from pydantic import BaseModel, Field
 
+from core.models.domain import ToolMetadata
+
 
 class ToolSchema(BaseModel):
-    """Metadata schema defining a tool."""
+    """Metadata schema defining a tool's name, description and parameters."""
 
     name: str = Field(..., description="Unique name of the tool")
     description: str = Field(
@@ -21,14 +23,26 @@ class ToolSchema(BaseModel):
 
 
 class BaseTool(ABC):
-    """Abstract Base Tool interface implemented by all AgentOS tools."""
+    """
+    Abstract Base Tool interface implemented by all AgentOS tools.
+
+    Every concrete tool must:
+      - Declare a class-level METADATA: ClassVar[ToolMetadata] object.
+      - Implement the async execute(**kwargs) method.
+
+    The METADATA object makes ToolRegistry metadata-driven so callers can
+    inspect tool capabilities without instantiating the tool class.
+    """
+
+    # Subclasses override this with their rich ToolMetadata descriptor.
+    METADATA: ClassVar[ToolMetadata]
 
     def __init__(
         self,
         name: str,
         description: str,
-        parameters: Dict[str, Any] | None = None,
-    ):
+        parameters: Optional[Dict[str, Any]] = None,
+    ) -> None:
         self.schema = ToolSchema(
             name=name,
             description=description,

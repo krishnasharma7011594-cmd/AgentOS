@@ -1,32 +1,34 @@
 """
-Research Agent — Phase 3 Implementation
+Research Agent — Phase 3 / Phase 4.5 Implementation
 
 The Research Agent is the first true tool-using agent in AgentOS.
 
-Phase 2 had a simple LLM wrapper that answered from training data alone.
-Phase 3 elevates it into a full ReAct agent:
-  - It registers the WebSearchTool into a ToolRegistry at startup.
-  - It delegates all reasoning to ReactReasoner via AgentLifecycle.
-  - It can search the web, observe results, and reason across multiple steps
-    before producing a final answer.
+Phase 3 elevated it into a full ReAct agent:
+  - Registers the WebSearchTool into a ToolRegistry at startup.
+  - Delegates all reasoning to ReactReasoner via AgentLifecycle.
+  - Can search the web, observe results, and reason across multiple steps.
 
-The agent itself owns very little logic — that's intentional. The lifecycle
-(AgentLifecycle) owns orchestration; the reasoner (ReactReasoner) owns the
-ReAct loop; the tool (WebSearchTool) owns search. ResearchAgent only declares:
-  1. What capabilities it exposes to the Supervisor
-  2. What tools it needs at runtime
-  3. What extra context helps the LLM be a better researcher
+Phase 4.5 adds:
+  - METADATA: ClassVar[AgentMetadata] for metadata-driven registry discovery.
+  - Uses Capability (replacing the former AgentCapability model).
+  - _extra_context() injects ExecutionContext results from prior tasks.
 
 Architecture Layer: Agents / Research
 """
 
-from typing import List, Optional
+from typing import ClassVar, List, Optional
 
 from agents.lifecycle import AgentLifecycle
 from agents.research.prompts_v1 import CAPABILITY_TEMPLATES, SYSTEM_CONTEXT
 from core.ai.providers.base import BaseLLMProvider
 from core.logging.logger import logger
-from core.models.domain import AgentCapability, ExecutionContext, Task, TaskResult
+from core.models.domain import (
+    AgentMetadata,
+    Capability,
+    ExecutionContext,
+    Task,
+    TaskResult,
+)
 from core.tools.implementations.web_search import WebSearchTool
 from core.tools.registry import ToolRegistry
 
@@ -47,22 +49,35 @@ class ResearchAgent(AgentLifecycle):
     Lifecycle: ReAct via AgentLifecycle → ReactReasoner
     """
 
-    # Capabilities declared to CapabilityRegistry at startup.
-    # The Supervisor's Router uses these to match incoming tasks.
-    CAPABILITIES: List[AgentCapability] = [
-        AgentCapability(
+    CAPABILITIES: List[Capability] = [
+        Capability(
             name="web_research",
             description="Research topics and return structured summaries using web search and LLM.",
+            version="1.0",
+            priority=10,
         ),
-        AgentCapability(
+        Capability(
             name="documentation_lookup",
             description="Look up documentation and explain technical concepts.",
+            version="1.0",
+            priority=10,
         ),
-        AgentCapability(
+        Capability(
             name="summarization",
             description="Summarize provided text or research findings.",
+            version="1.0",
+            priority=10,
         ),
     ]
+
+    METADATA: ClassVar[AgentMetadata] = AgentMetadata(
+        name="ResearchAgent",
+        description="Autonomous agent specialised in web research and summarization.",
+        version="1.0",
+        author="AgentOS",
+        capabilities=CAPABILITIES,
+        supported_tools=["web_search"],
+    )
 
     def __init__(
         self,
@@ -119,7 +134,7 @@ class ResearchAgent(AgentLifecycle):
     # Capability Registration (called by DI container at startup)
     # ------------------------------------------------------------------
 
-    def get_capabilities(self) -> List[AgentCapability]:
+    def get_capabilities(self) -> List[Capability]:
         """Return declared capabilities for registration in CapabilityRegistry."""
         return self.CAPABILITIES
 
@@ -146,7 +161,6 @@ class ResearchAgent(AgentLifecycle):
         # Apply capability-specific prompt template to frame the task correctly
         template = CAPABILITY_TEMPLATES.get(task.required_capability)
         if template:
-            # Create a new task with the formatted description
             task = task.model_copy(
                 update={"description": template.format(description=task.description)}
             )

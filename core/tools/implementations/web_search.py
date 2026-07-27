@@ -13,9 +13,10 @@ failure and decide how to proceed rather than throwing an uncaught exception.
 Architecture Layer: Core / Tools / Implementations
 """
 
-from typing import Any, List
+from typing import Any, ClassVar, List
 
 from core.logging.logger import logger
+from core.models.domain import ToolMetadata
 from core.tools.base import BaseTool
 
 
@@ -31,6 +32,34 @@ class WebSearchTool(BaseTool):
         query (str, required)   : The search query string.
         max_results (int, opt.) : Number of results to return (default: 3).
     """
+
+    METADATA: ClassVar[ToolMetadata] = ToolMetadata(
+        name="web_search",
+        description=(
+            "Search the web for current information about a topic. "
+            "Use this when you need facts, news, or data you might not have."
+        ),
+        version="1.0",
+        author="AgentOS",
+        permissions=["network"],
+        tags=["search", "web", "information-retrieval"],
+        input_schema={
+            "query": {
+                "type": "string",
+                "description": "The search query to send to DuckDuckGo.",
+                "required": True,
+            },
+            "max_results": {
+                "type": "integer",
+                "description": "Number of results to return (default: 3, max: 8).",
+                "required": False,
+            },
+        },
+        output_schema={
+            "type": "string",
+            "description": "Formatted list of search result titles, URLs, and snippets.",
+        },
+    )
 
     # Number of results to return when the caller doesn't specify
     DEFAULT_MAX_RESULTS: int = 3

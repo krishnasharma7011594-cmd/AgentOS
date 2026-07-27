@@ -3,7 +3,7 @@
 import pytest
 
 from core.exceptions.base import AgentNotFoundError, CapabilityNotFoundError
-from core.models.domain import AgentCapability
+from core.models.domain import Capability
 from registry.agent_registry import AgentRegistry
 from registry.capability_registry import CapabilityRegistry
 
@@ -11,8 +11,8 @@ from registry.capability_registry import CapabilityRegistry
 def test_capability_registry_registration_and_lookup() -> None:
     cap_reg = CapabilityRegistry()
     capabilities = [
-        AgentCapability(name="web_research", description="Search web"),
-        AgentCapability(name="summarization", description="Summarize text"),
+        Capability(name="web_research", description="Search web"),
+        Capability(name="summarization", description="Summarize text"),
     ]
 
     cap_reg.register_agent_capabilities("ResearchAgent", capabilities)
@@ -40,7 +40,7 @@ def test_agent_registry_operations() -> None:
     class DummyAgent:
         name = "DummyAgent"
         description = "Dummy description"
-        capabilities = [AgentCapability(name="dummy_cap", description="Dummy")]
+        capabilities = [Capability(name="dummy_cap", description="Dummy")]
 
     dummy = DummyAgent()
     agent_reg.register_agent(dummy.name, dummy)

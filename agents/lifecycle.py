@@ -27,7 +27,7 @@ from core.ai.reasoning.react import ReactReasoner
 from core.exceptions.base import LLMProviderError
 from core.logging.logger import logger
 from core.models.domain import (
-    AgentCapability,
+    Capability,
     ExecutionContext,
     ReasoningStep,
     Task,
@@ -55,7 +55,7 @@ class AgentLifecycle(BaseAgent):
         name: str = "agent",
         description: str = "AgentOS lifecycle agent",
         llm_provider: Optional[BaseLLMProvider] = None,
-        capabilities: Optional[List[AgentCapability]] = None,
+        capabilities: Optional[List[Capability]] = None,
         tool_registry: Optional[ToolRegistry] = None,
     ) -> None:
         super().__init__(

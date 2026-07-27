@@ -1,56 +1,80 @@
 """
 Capability Registry
 
-Maps functional capability keys to agent names.
-Enables dynamic task routing: the Supervisor queries this registry to discover which
-agent provides a required capability without hardcoding agent dependencies.
+Maps Capability objects to agent names for dynamic task routing.
+Enables the Supervisor to discover which agent provides a required capability
+without hardcoding agent dependencies.
+
+Phase 4.5: Upgraded to store full Capability objects (replacing raw strings)
+and use priority-based resolution when multiple agents serve the same capability.
 
 Architecture Layer: Registry
 """
 
-from typing import Dict, List, Set
+from typing import Dict, List, Optional, Set
 
 from core.exceptions.base import CapabilityNotFoundError
 from core.logging.logger import logger
-from core.models.domain import AgentCapability
+from core.models.domain import Capability
 
 
 class CapabilityRegistry:
     """
-    Central index mapping capability names (e.g. 'web_research') to registered agent names.
+    Central index mapping capability names to registered agent names.
 
-    Decouples task requirements from agent implementations: agents register their declared
-    capabilities at startup, and the router queries this registry to resolve the correct agent.
+    Decouples task requirements from agent implementations. Agents register
+    their Capability descriptors at startup; the router queries this registry
+    to resolve the correct agent.
+
+    Phase 4.5: Resolution uses Capability.priority — when multiple agents
+    provide the same capability the one with the highest priority wins.
     """
 
     def __init__(self) -> None:
+        # capability name → set of agent names that provide it
         self._capability_to_agents: Dict[str, Set[str]] = {}
-        self._agent_capabilities: Dict[str, List[AgentCapability]] = {}
+        # agent name → list of Capability objects it declared
+        self._agent_capabilities: Dict[str, List[Capability]] = {}
+        # (capability name, agent name) → priority for resolution
+        self._priorities: Dict[str, Dict[str, int]] = {}
 
-    def register_agent_capabilities(
-        self, agent_name: str, capabilities: List[AgentCapability]
-    ) -> None:
+    # ------------------------------------------------------------------
+    # Registration
+    # ------------------------------------------------------------------
+
+    def register_agent_capabilities(self, agent_name: str, capabilities: List[Capability]) -> None:
         """
-        Registers capability bindings for an agent.
+        Register capability bindings for an agent.
 
         Args:
-            agent_name: Canonical name of registering agent.
-            capabilities: List of declared AgentCapability descriptors.
+            agent_name:   Canonical name of registering agent.
+            capabilities: List of declared Capability descriptors.
         """
         self._agent_capabilities[agent_name] = capabilities
-        for capability in capabilities:
-            if capability.name not in self._capability_to_agents:
-                self._capability_to_agents[capability.name] = set()
-            self._capability_to_agents[capability.name].add(agent_name)
+        for cap in capabilities:
+            if cap.name not in self._capability_to_agents:
+                self._capability_to_agents[cap.name] = set()
+                self._priorities[cap.name] = {}
+            self._capability_to_agents[cap.name].add(agent_name)
+            self._priorities[cap.name][agent_name] = cap.priority
             logger.debug(
                 "CapabilityRegistry: capability registered",
-                capability=capability.name,
+                capability=cap.name,
                 agent=agent_name,
+                priority=cap.priority,
             )
+
+    # ------------------------------------------------------------------
+    # Resolution
+    # ------------------------------------------------------------------
 
     def find_agent_for_capability(self, capability_name: str) -> str:
         """
-        Resolves the name of an agent qualified to execute a required capability.
+        Resolve the name of an agent qualified to execute a required capability.
+
+        When multiple agents provide the same capability, the one with the
+        highest priority value is selected. Ties are broken alphabetically
+        for determinism.
 
         Args:
             capability_name: Required capability key.
@@ -65,29 +89,59 @@ class CapabilityRegistry:
         if not agents:
             raise CapabilityNotFoundError(
                 f"No agent registered for capability: '{capability_name}'.",
-                details=f"Registered capabilities: {list(self._capability_to_agents.keys())}",
+                details=(f"Registered capabilities: {list(self._capability_to_agents.keys())}"),
             )
-        # Deterministic resolution: sorts agent names and returns first available match
-        agent_name = sorted(agents)[0]
+
+        priorities = self._priorities.get(capability_name, {})
+        # Sort: highest priority first, then alphabetical for ties
+        agent_name = sorted(agents, key=lambda a: (-priorities.get(a, 0), a))[0]
         logger.debug(
             "CapabilityRegistry: agent resolved",
             capability=capability_name,
             agent=agent_name,
+            priority=priorities.get(agent_name, 0),
         )
         return agent_name
 
     def find_all_agents_for_capability(self, capability_name: str) -> List[str]:
-        """Returns all agent names offering a capability."""
-        return sorted(self._capability_to_agents.get(capability_name, set()))
+        """Return all agent names offering a capability, sorted by priority desc."""
+        agents = self._capability_to_agents.get(capability_name, set())
+        priorities = self._priorities.get(capability_name, {})
+        return sorted(agents, key=lambda a: (-priorities.get(a, 0), a))
+
+    # ------------------------------------------------------------------
+    # Introspection
+    # ------------------------------------------------------------------
 
     def list_capabilities(self) -> List[str]:
-        """Returns all registered capability names."""
+        """Return all registered capability names (sorted)."""
         return sorted(self._capability_to_agents.keys())
 
-    def get_agent_capabilities(self, agent_name: str) -> List[AgentCapability]:
-        """Returns capabilities declared by a specific agent."""
+    def get_agent_capabilities(self, agent_name: str) -> List[Capability]:
+        """Return Capability objects declared by a specific agent."""
         return self._agent_capabilities.get(agent_name, [])
 
+    def get_capability(self, capability_name: str) -> Optional[Capability]:
+        """
+        Return the highest-priority Capability descriptor for a given name.
+
+        Returns None if no agent provides this capability.
+        """
+        agents = self.find_all_agents_for_capability(capability_name)
+        if not agents:
+            return None
+        top_agent = agents[0]
+        for cap in self._agent_capabilities.get(top_agent, []):
+            if cap.name == capability_name:
+                return cap
+        return None
+
     def is_capability_available(self, capability_name: str) -> bool:
-        """Checks if a capability key is registered to at least one agent."""
+        """Check if a capability key is registered to at least one agent."""
         return bool(self._capability_to_agents.get(capability_name))
+
+    def clear(self) -> None:
+        """Clear all registrations. Used primarily in test fixtures."""
+        self._capability_to_agents.clear()
+        self._agent_capabilities.clear()
+        self._priorities.clear()

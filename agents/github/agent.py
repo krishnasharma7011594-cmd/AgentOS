@@ -1,15 +1,36 @@
 """GitHubAgent implementation skeleton."""
 
-from typing import Optional
+from typing import ClassVar, Optional
 
 from agents.base import BaseAgent
 from agents.github.config import GitHubAgentConfig
 from agents.github.memory import GitHubAgentMemory
-from core.models.domain import AgentCapability, ExecutionContext, Task, TaskResult, TaskStatus
+from core.models.domain import (
+    AgentMetadata,
+    Capability,
+    ExecutionContext,
+    Task,
+    TaskResult,
+    TaskStatus,
+)
 
 
 class GitHubAgent(BaseAgent):
     """GitHub Agent skeleton."""
+
+    METADATA: ClassVar[AgentMetadata] = AgentMetadata(
+        name="GitHubAgent",
+        description=(
+            "Specialized agent for GitHub operations including issues, PRs, and repositories."
+        ),
+        version="1.0",
+        author="AgentOS",
+        capabilities=[
+            Capability(name="pr_review", description="Review pull requests"),
+            Capability(name="manage_issues", description="Create, label, and assign issues"),
+        ],
+        supported_tools=[],
+    )
 
     def __init__(self, config: GitHubAgentConfig | None = None):
         cfg = config or GitHubAgentConfig()
@@ -19,11 +40,11 @@ class GitHubAgent(BaseAgent):
                 "Specialized agent for GitHub operations including issues, PRs, and repositories."
             ),
             capabilities=[
-                AgentCapability(
+                Capability(
                     name="pr_review",
                     description="Review pull requests",
                 ),
-                AgentCapability(
+                Capability(
                     name="manage_issues",
                     description="Create, label, and assign issues",
                 ),

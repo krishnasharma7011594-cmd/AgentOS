@@ -1,12 +1,18 @@
-"""CodingAgent implementation."""
+"""CodingAgent implementation — Phase 4 / Phase 4.5."""
 
-from typing import List, Optional
+from typing import ClassVar, List, Optional
 
 from agents.coding.prompts_v1 import CAPABILITY_TEMPLATES, SYSTEM_CONTEXT
 from agents.lifecycle import AgentLifecycle
 from core.ai.providers.base import BaseLLMProvider
 from core.logging.logger import logger
-from core.models.domain import AgentCapability, ExecutionContext, Task, TaskResult
+from core.models.domain import (
+    AgentMetadata,
+    Capability,
+    ExecutionContext,
+    Task,
+    TaskResult,
+)
 from core.tools.registry import ToolRegistry
 
 
@@ -25,16 +31,31 @@ class CodingAgent(AgentLifecycle):
     Lifecycle: ReAct via AgentLifecycle → ReactReasoner
     """
 
-    CAPABILITIES: List[AgentCapability] = [
-        AgentCapability(
+    CAPABILITIES: List[Capability] = [
+        Capability(
             name="code_generation",
             description="Generate production-ready code",
+            version="1.0",
+            priority=10,
         ),
-        AgentCapability(
+        Capability(
             name="code_analysis",
             description="Analyze and debug existing codebase",
+            version="1.0",
+            priority=10,
         ),
     ]
+
+    METADATA: ClassVar[AgentMetadata] = AgentMetadata(
+        name="CodingAgent",
+        description=(
+            "Specialized agent for code generation, software design, debugging, and testing."
+        ),
+        version="1.0",
+        author="AgentOS",
+        capabilities=CAPABILITIES,
+        supported_tools=[],
+    )
 
     def __init__(
         self,
@@ -53,10 +74,7 @@ class CodingAgent(AgentLifecycle):
         logger.info("coding_agent_init", agent_id=self.agent_id)
 
     def _setup_tools(self) -> None:
-        """
-        Register CodingAgent tools.
-        For now, no tools are required for simple code generation.
-        """
+        """No tools required for pure LLM code generation."""
         pass
 
     def _extra_context(self, context: Optional[ExecutionContext] = None) -> Optional[str]:
@@ -75,16 +93,14 @@ class CodingAgent(AgentLifecycle):
         """Coding tasks typically just generate code, 3 steps is plenty."""
         return 3
 
-    def get_capabilities(self) -> List[AgentCapability]:
+    def get_capabilities(self) -> List[Capability]:
         """Return declared capabilities for registration in CapabilityRegistry."""
         return self.CAPABILITIES
 
     async def execute_task(
         self, task: Task, context: Optional[ExecutionContext] = None
     ) -> TaskResult:
-        """
-        Execute a coding task through the ReAct lifecycle.
-        """
+        """Execute a coding task through the ReAct lifecycle."""
         logger.info(
             "coding_agent_task_start",
             agent_id=self.agent_id,
