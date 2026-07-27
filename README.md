@@ -1,8 +1,8 @@
 # AgentOS
 
-> **Notice**: AgentOS is currently under active development. Phase 1 (Architecture & Skeleton) and Phase 2 (End-to-End Functional Orchestration) are complete.
+> **Notice**: AgentOS is currently under active development. Phases 1 through 4.5 are complete.
 
-AgentOS is a production-grade, highly modular, clean-architecture framework designed to evolve into an Agentic AI Operating System. It provides a supervisor-driven, multi-agent runtime where tasks are dynamically planned, routed, validated, and executed.
+AgentOS is a production-grade, highly modular, clean-architecture framework designed to evolve into an Agentic AI Operating System. It provides a supervisor-driven, multi-agent runtime where tasks are dynamically planned, routed, validated, and executed using a robust DAG-based `ExecutionGraph`.
 
 ---
 
@@ -14,10 +14,11 @@ AgentOS strictly enforces **SOLID principles** and **Clean Architecture**. Depen
                   [ User / Client ]
                          │
                          ▼
-                  [ Apps Layer ] (FastAPI / REST, Typer CLI, Dashboard)
-                         │
-                         ▼
-             [ Supervisor Orchestrator ]
+                   [ Apps Layer ] (FastAPI / REST, Typer CLI, Dashboard)
+                          │
+                          ▼
+              [ Supervisor Orchestrator ]
+           (ExecutionGraph & MetricsCollector)
            ┌─────────────┼─────────────┐
            ▼             ▼             ▼
       [ Planner ]   [ Router ]   [ Validator ]
@@ -45,12 +46,14 @@ AgentOS strictly enforces **SOLID principles** and **Clean Architecture**. Depen
 
 ---
 
-## 🚀 Features Implemented (Phase 1 & Phase 2)
+## 🚀 Features Implemented (Up to Phase 4.5)
 
 - **Decomposed Supervisor Architecture**: Separated single-responsibility services (`orchestrator`, `planner`, `router`, `validator`, `report_generator`).
-- **Dynamic Registries**: `AgentRegistry` for runtime registration and `CapabilityRegistry` for capability-to-agent mapping.
+- **Graph-based Execution Engine**: Replaced sequential loops with `ExecutionGraph` (DAG state machine) that handles dynamic task skipping, dependencies, and execution states.
+- **Telemetry & Reporting**: Embedded `MetricsCollector` to track agent runtime and logic step counts. Uses `ReportBuilder` to synthesize structured `ExecutionReport`s.
+- **Dynamic Registries**: `AgentRegistry` and `CapabilityRegistry` support metadata-driven lookup and capability prioritization for runtime resolution.
 - **Provider Abstraction & Factory**: `BaseLLMProvider` interface with operational `GeminiProvider` (`gemini-1.5-flash`) and `GroqProvider` (`llama-3.3-70b-versatile`).
-- **Standardized Agent Module Template**: Uniform 6-file structure across all specialized agents (`ResearchAgent`, `CodingAgent`, `GitHubAgent`, `FinanceAgent`).
+- **Standardized Modules**: Uniform structure across agents (`ResearchAgent`, `CodingAgent`, etc.) utilizing declarative `METADATA` classes (`AgentMetadata` and `ToolMetadata`).
 - **FastAPI Endpoint Suite**: Full REST endpoints (`POST /chat`, `POST /task`, `GET /health`, `GET /agents`).
 - **Structured Logging & Diagnostics**: Production JSON logging via `structlog`.
 - **Developer & DevOps Suite**: Pytest suite, Ruff linting, Black formatting, Mypy type-checking, Docker build, and GitHub Actions CI pipeline.
@@ -85,9 +88,10 @@ AgentOS/
 │   ├── config/           # Pydantic Settings configuration loader
 │   ├── di/               # Dependency injection container
 │   ├── exceptions/       # Custom domain exception hierarchy
+│   ├── execution/        # Graph execution engine, context, metrics, and reporting
 │   ├── logging/          # Centralized structured logger
 │   ├── memory/           # Multi-tiered memory layers (working, session, long-term, cache)
-│   ├── models/           # Domain entities (Goal, Task, TaskResult, ExecutionResult)
+│   ├── models/           # Domain entities (Goal, Task, TaskResult, ExecutionResult, ExecutionReport)
 │   └── tools/            # BaseTool & ToolRegistry interfaces
 ├── knowledge/            # RAG contracts (documents, embeddings, retrievers, vectorstores)
 ├── workflow/             # State machine states & transitions
@@ -168,10 +172,10 @@ mypy core supervisor registry agents workflow task_queue knowledge observability
 ## 🗺️ Current Roadmap
 
 - [x] **Phase 1: Architecture & Monorepo Skeleton** — SOLID design, ABCs, registry, and dependency injection container.
-- [x] **Phase 2: Functional End-to-End Orchestration** — Full `POST /chat` → `Supervisor` → `Planner` → `CapabilityRegistry` → `ResearchAgent` → `Gemini/Groq` → `Validator` → `Response` flow.
-- [ ] **Phase 3: Asynchronous Task Execution & Tools** — Async task queue (Redis/Celery), tool permission sandboxing, and parallel task execution.
-- [ ] **Phase 4: RAG & Persistent Memory** — Vector store integration (Chroma/Qdrant) and episodic session persistence.
-- [ ] **Phase 5: Web Dashboard & Cluster Deployment** — UI dashboard and distributed multi-node scaling.
+- [x] **Phase 2: Functional End-to-End Orchestration** — Full `POST /chat` → `Supervisor` flow.
+- [x] **Phase 3 & 4: Tools & Agents** — Basic tool execution and multi-agent integrations.
+- [x] **Phase 4.5: Architecture Refinement** — Graph-based execution engine (`ExecutionGraph`), DAG plan validation, telemetry/metrics, and metadata-driven capability routing.
+- [ ] **Phase 5: Advanced Planning & RAG** — Dynamic replanning, RAG memory persistence, and web dashboard.
 
 ---
 
