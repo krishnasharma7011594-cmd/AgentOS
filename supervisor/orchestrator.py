@@ -52,6 +52,7 @@ from supervisor.decision_engine import DecisionEngine
 from supervisor.evaluator import TaskEvaluator
 from supervisor.planner import SupervisorPlanner
 from supervisor.policies import RetryPolicy
+from supervisor.reflection.engine import ReflectionEngine
 from supervisor.report_generator import SupervisorReportGenerator
 from supervisor.router import SupervisorRouter
 from supervisor.validator import SupervisorValidator
@@ -99,7 +100,8 @@ class SupervisorOrchestrator:
         self.report_generator = report_generator
         self._evaluator = TaskEvaluator()
         self._decision_engine = DecisionEngine(retry_policy=retry_policy or RetryPolicy())
-        logger.info("SupervisorOrchestrator: initialized (Phase 5 — Adaptive)")
+        self._reflection_engine = ReflectionEngine()
+        logger.info("SupervisorOrchestrator: initialized (Phase 5+6 — Adaptive+Reflective)")
 
     async def execute_goal(self, goal: Goal) -> ExecutionResult:
         """
@@ -293,6 +295,11 @@ class SupervisorOrchestrator:
             goal, task_results, validations, metrics
         )
 
+        # ── Step 8: Reflect on execution (Phase 6) ────────────────────────
+        if execution_result.report:
+            reflection_report = self._reflection_engine.reflect(execution_result.report)
+            execution_result.report.reflection_report = reflection_report
+
         logger.info(
             "SupervisorOrchestrator: execution complete",
             goal_id=goal.id,
@@ -301,6 +308,11 @@ class SupervisorOrchestrator:
             retries=collector.retry_count,
             inserted_tasks=collector.inserted_task_count,
             decisions=len(collector.get_decision_log()),
+            reflection_score=(
+                execution_result.report.reflection_report.scores.overall_score
+                if execution_result.report and execution_result.report.reflection_report
+                else None
+            ),
         )
         return execution_result
 

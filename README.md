@@ -21,8 +21,8 @@ This diagram illustrates how the system's core components are decoupled through 
                           │
                           ▼
               [ Supervisor Orchestrator ]
-           (ExecutionGraph, MetricsCollector)
-           ┌─────────────┼─────────────┐
+           [ ExecutionGraph & MetricsCollector ]
+           [ DecisionEngine & ReflectionEngine ]┌─────────────┼─────────────┐
            ▼             ▼             ▼
       [ Planner ]   [ Router ]   [ Evaluator ]
                          │             │
@@ -227,12 +227,14 @@ mypy .
 
 ## 🗺️ Current Roadmap
 
-- [x] **Phase 1: Architecture & Monorepo Skeleton** — SOLID design, ABCs, registry, and dependency injection container.
-- [x] **Phase 2: Functional End-to-End Orchestration** — Full `POST /chat` → `Supervisor` flow.
-- [x] **Phase 3 & 4: Tools & Agents** — Basic tool execution and multi-agent integrations.
-- [x] **Phase 4.5: Architecture Refinement** — Graph-based execution engine (`ExecutionGraph`), DAG plan validation, telemetry/metrics, and metadata-driven capability routing.
-- [x] **Phase 5: Adaptive Supervisor** — `TaskEvaluator`, `DecisionEngine`, retry policies, graph mutation, replanning, and event emission.
-- [ ] **Phase 6: Advanced Planning & RAG** — Full LLM-driven planning, RAG memory persistence, and web dashboard.
+- [x] Phase 1: Core Tooling & API Foundations
+- [x] Phase 2: Agent Architecture & Registry
+- [x] Phase 3: Single-Agent Execution (ReAct Loop)
+- [x] Phase 4: Multi-Agent Orchestration (DAG Execution)
+- [x] Phase 4.5: Metadata, Observability & Validation
+- [x] Phase 5: Adaptive Supervisor
+- [x] Phase 6: Reflection Layer
+- [ ] **Phase 7: Advanced Planning & RAG** — Full LLM-driven planning, RAG memory persistence, and web dashboard.
 
 ---
 

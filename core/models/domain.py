@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from core.models.reflection import ReflectionReport
 from core.utils.helpers import generate_uuid
 
 
@@ -361,6 +362,12 @@ class ExecutionMetrics(BaseModel):
     agent_execution_times: Dict[str, float] = Field(default_factory=dict)
     total_tool_calls: int = Field(default=0)
     total_reasoning_steps: int = Field(default=0)
+    
+    # Phase 5 Adaptive metrics
+    retry_count: int = Field(default=0)
+    inserted_task_count: int = Field(default=0)
+    failure_category_counts: Dict[str, int] = Field(default_factory=dict)
+    decision_log: List["DecisionLogEntry"] = Field(default_factory=list)
 
 
 # ---------------------------------------------------------------------------
@@ -399,6 +406,10 @@ class ExecutionReport(BaseModel):
         description="agent_id → list of task summaries",
     )
     metrics: ExecutionMetrics = Field(default_factory=ExecutionMetrics)
+    reflection_report: Optional[ReflectionReport] = Field(
+        default=None,
+        description="Structured analysis of the completed execution (Phase 6)",
+    )
     final_response: str = Field(..., description="Synthesized final answer text")
     generated_at: datetime = Field(default_factory=datetime.utcnow)
 

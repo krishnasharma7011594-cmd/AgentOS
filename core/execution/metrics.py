@@ -119,6 +119,10 @@ class MetricsCollector:
             agent_execution_times={k: round(v, 2) for k, v in self._agent_times.items()},
             total_tool_calls=tool_calls,
             total_reasoning_steps=reasoning_steps,
+            retry_count=self._retry_count,
+            inserted_task_count=self._inserted_task_count,
+            failure_category_counts=dict(self._failure_category_counts),
+            decision_log=list(self._decision_log),
         )
 
     # ------------------------------------------------------------------
