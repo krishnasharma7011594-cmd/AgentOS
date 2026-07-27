@@ -189,6 +189,8 @@ class SupervisorOrchestrator:
                     )
                     context.results[skipped_task.id] = skip_result
                     task_results.append(skip_result)
+                    collector.start_task(skipped_task.id)
+                    collector.end_task(skipped_task.id, "supervisor", skip_result)
 
         # ── Step 5: Finalise metrics ─────────────────────────────────────
         metrics = collector.finalize(total_tasks=graph.task_count)

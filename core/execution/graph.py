@@ -204,8 +204,11 @@ class ExecutionGraph:
         return self._statuses[task_id]
 
     def is_complete(self) -> bool:
-        """True when no tasks remain in PENDING or READY state."""
-        return not self.get_remaining_tasks()
+        """True when all tasks are in a terminal state."""
+        return all(
+            s in (TaskStatus.SUCCESS, TaskStatus.FAILED, TaskStatus.SKIPPED)
+            for s in self._statuses.values()
+        )
 
     # ------------------------------------------------------------------
     # Introspection

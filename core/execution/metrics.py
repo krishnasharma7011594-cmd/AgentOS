@@ -10,7 +10,7 @@ Architecture Layer: Core / Execution
 """
 
 import time
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 
 from core.models.domain import ExecutionMetrics, TaskResult, TaskStatus
 
@@ -111,7 +111,7 @@ class MetricsCollector:
 # ---------------------------------------------------------------------------
 
 
-def _count_tool_calls(meta: Dict) -> int:
+def _count_tool_calls(meta: Dict[str, Any]) -> int:
     """Extract tool call count from TaskResult.metadata."""
     steps = meta.get("reasoning_steps", [])
     if isinstance(steps, list):
@@ -119,7 +119,7 @@ def _count_tool_calls(meta: Dict) -> int:
     return 0
 
 
-def _count_reasoning_steps(meta: Dict) -> int:
+def _count_reasoning_steps(meta: Dict[str, Any]) -> int:
     """Extract reasoning step count from TaskResult.metadata."""
     steps = meta.get("reasoning_steps", [])
     if isinstance(steps, list):
