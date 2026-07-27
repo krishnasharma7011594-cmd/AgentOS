@@ -1,9 +1,10 @@
 """FinanceAgent implementation skeleton."""
 
+from typing import Optional
+
 from agents.base import BaseAgent
 from agents.finance.config import FinanceAgentConfig
 from agents.finance.memory import FinanceAgentMemory
-from typing import Optional
 from core.models.domain import AgentCapability, ExecutionContext, Task, TaskResult, TaskStatus
 
 
@@ -33,7 +34,9 @@ class FinanceAgent(BaseAgent):
     async def initialize(self) -> None:
         pass
 
-    async def execute_task(self, task: Task, context: Optional[ExecutionContext] = None) -> TaskResult:
+    async def execute_task(
+        self, task: Task, context: Optional[ExecutionContext] = None
+    ) -> TaskResult:
         return TaskResult(
             task_id=task.id,
             agent_id=self.name,

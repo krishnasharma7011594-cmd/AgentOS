@@ -7,9 +7,10 @@ Enforces decoupling: the Supervisor never hardcodes agent class references or na
 Architecture Layer: Supervisor / Router
 """
 
+from typing import Optional
+
 from core.exceptions.base import AgentNotFoundError, CapabilityNotFoundError
 from core.logging.logger import logger
-from typing import Optional
 from core.models.domain import ExecutionContext, Task, TaskResult, TaskStatus
 from registry.agent_registry import AgentRegistry
 from registry.capability_registry import CapabilityRegistry
@@ -41,7 +42,9 @@ class SupervisorRouter:
         self.agent_registry = agent_registry
         self.capability_registry = capability_registry
 
-    async def route_task(self, task: Task, context: Optional[ExecutionContext] = None) -> TaskResult:
+    async def route_task(
+        self, task: Task, context: Optional[ExecutionContext] = None
+    ) -> TaskResult:
         """
         Resolves the appropriate agent for a task and invokes its execution.
 

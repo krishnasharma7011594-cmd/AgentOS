@@ -2,8 +2,8 @@
 
 import pytest
 
-from agents.research.agent import ResearchAgent
 from agents.coding.agent import CodingAgent
+from agents.research.agent import ResearchAgent
 from core.models.domain import Goal
 from core.utils.helpers import generate_uuid
 from registry.agent_registry import AgentRegistry
@@ -54,11 +54,11 @@ async def test_supervisor_orchestrator_end_to_end() -> None:
     assert result.status == "success"
     assert "LangGraph" in result.response
     assert len(result.tasks) == 2
-    
+
     agent_ids = [t.agent_id for t in result.tasks]
     assert any(a.startswith("ResearchAgent") for a in agent_ids)
     assert any(a.startswith("CodingAgent") for a in agent_ids)
-    
+
     # Check if first task output is referenced in second task (dependency)
     # The tasks are ordered, so the second one should be CodingAgent.
     assert len(result.tasks[1].metadata["reasoning_steps"]) > 0

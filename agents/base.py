@@ -58,7 +58,9 @@ class BaseAgent(ABC):
         pass
 
     @abstractmethod
-    async def execute_task(self, task: Task, context: Optional[ExecutionContext] = None) -> TaskResult:
+    async def execute_task(
+        self, task: Task, context: Optional[ExecutionContext] = None
+    ) -> TaskResult:
         """
         Primary execution entry point called by SupervisorRouter.
 

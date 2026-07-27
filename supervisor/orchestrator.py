@@ -102,7 +102,7 @@ class SupervisorOrchestrator:
         # Step 2: Route and execute tasks sequentially with dependency validation
         task_results: list[TaskResult] = []
         context = ExecutionContext(goal_id=goal.id)
-        
+
         for task in plan.tasks:
             logger.info(
                 "SupervisorOrchestrator: evaluating task",
@@ -110,7 +110,7 @@ class SupervisorOrchestrator:
                 task_name=task.name,
                 capability=task.required_capability,
             )
-            
+
             # Verify dependencies
             deps_failed = False
             for dep_id in task.dependencies:
@@ -118,7 +118,7 @@ class SupervisorOrchestrator:
                 if not dep_result or dep_result.status != TaskStatus.SUCCESS:
                     deps_failed = True
                     break
-                    
+
             if deps_failed:
                 logger.error(
                     "SupervisorOrchestrator: task dependencies failed",
@@ -134,7 +134,7 @@ class SupervisorOrchestrator:
                 task_results.append(result)
                 context.results[task.id] = result
                 continue
-                
+
             logger.info(
                 "SupervisorOrchestrator: executing task",
                 task_id=task.id,

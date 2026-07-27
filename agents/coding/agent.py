@@ -2,8 +2,8 @@
 
 from typing import List, Optional
 
-from agents.lifecycle import AgentLifecycle
 from agents.coding.prompts_v1 import CAPABILITY_TEMPLATES, SYSTEM_CONTEXT
+from agents.lifecycle import AgentLifecycle
 from core.ai.providers.base import BaseLLMProvider
 from core.logging.logger import logger
 from core.models.domain import AgentCapability, ExecutionContext, Task, TaskResult
@@ -43,7 +43,10 @@ class CodingAgent(AgentLifecycle):
     ) -> None:
         super().__init__(
             name="CodingAgent",
-            description="Specialized agent for code generation, software design, debugging, and testing.",
+            description=(
+                "Specialized agent for code generation, "
+                "software design, debugging, and testing."
+            ),
             llm_provider=llm_provider,
             capabilities=self.CAPABILITIES,
             tool_registry=tool_registry,
@@ -65,7 +68,7 @@ class CodingAgent(AgentLifecycle):
         prompt = SYSTEM_CONTEXT
         if context and context.results:
             prompt += "\n\nPREVIOUS TASK OUTPUTS:\n"
-            for task_id, res in context.results.items():
+            for _task_id, res in context.results.items():
                 prompt += f"\n--- Task ({res.agent_id}) ---\n{res.summary}\n"
         return prompt
 
@@ -77,7 +80,9 @@ class CodingAgent(AgentLifecycle):
         """Return declared capabilities for registration in CapabilityRegistry."""
         return self.CAPABILITIES
 
-    async def execute_task(self, task: Task, context: Optional[ExecutionContext] = None) -> TaskResult:
+    async def execute_task(
+        self, task: Task, context: Optional[ExecutionContext] = None
+    ) -> TaskResult:
         """
         Execute a coding task through the ReAct lifecycle.
         """

@@ -102,7 +102,7 @@ class ResearchAgent(AgentLifecycle):
         prompt = SYSTEM_CONTEXT
         if context and context.results:
             prompt += "\n\nPREVIOUS TASK OUTPUTS:\n"
-            for task_id, res in context.results.items():
+            for _task_id, res in context.results.items():
                 prompt += f"\n--- Task ({res.agent_id}) ---\n{res.summary}\n"
         return prompt
 
@@ -127,7 +127,9 @@ class ResearchAgent(AgentLifecycle):
     # Task Execution — delegates to AgentLifecycle
     # ------------------------------------------------------------------
 
-    async def execute_task(self, task: Task, context: Optional[ExecutionContext] = None) -> TaskResult:
+    async def execute_task(
+        self, task: Task, context: Optional[ExecutionContext] = None
+    ) -> TaskResult:
         """
         Execute a research task through the ReAct lifecycle.
 

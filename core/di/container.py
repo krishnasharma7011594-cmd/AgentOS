@@ -37,8 +37,8 @@ def _register_agents(
     This enables dynamic routing: the Supervisor discovers agents by capability rather than
     importing agent modules directly.
     """
-    from agents.research.agent import ResearchAgent
     from agents.coding.agent import CodingAgent
+    from agents.research.agent import ResearchAgent
 
     # ResearchAgent receives its LLM provider and shared ToolRegistry via constructor injection
     research_agent = ResearchAgent(
