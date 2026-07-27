@@ -26,7 +26,7 @@ from core.ai.providers.base import BaseLLMProvider
 from core.ai.reasoning.react import ReactReasoner
 from core.exceptions.base import LLMProviderError
 from core.logging.logger import logger
-from core.models.domain import AgentCapability, ReasoningStep, Task, TaskResult, TaskStatus
+from core.models.domain import AgentCapability, ExecutionContext, ReasoningStep, Task, TaskResult, TaskStatus
 from core.tools.registry import ToolRegistry
 from core.utils.helpers import generate_uuid
 
@@ -100,7 +100,7 @@ class AgentLifecycle(BaseAgent):
         """
         ...
 
-    def _extra_context(self) -> Optional[str]:
+    def _extra_context(self, context: Optional[ExecutionContext] = None) -> Optional[str]:
         """
         Return additional context injected into the first user message.
 
@@ -117,7 +117,7 @@ class AgentLifecycle(BaseAgent):
     # Task Execution — the lifecycle entry point
     # ------------------------------------------------------------------
 
-    async def execute_task(self, task: Task) -> TaskResult:
+    async def execute_task(self, task: Task, context: Optional[ExecutionContext] = None) -> TaskResult:
         """
         Execute a task through the full ReAct lifecycle.
 
@@ -157,7 +157,7 @@ class AgentLifecycle(BaseAgent):
             logger.info("agent_lifecycle_react_start", agent_id=self.agent_id, task_id=task.id)
             steps, final_answer = await self._reasoner.run(
                 task=task,
-                extra_context=self._extra_context(),
+                extra_context=self._extra_context(context),
             )
 
             logger.info(

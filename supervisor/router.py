@@ -9,7 +9,8 @@ Architecture Layer: Supervisor / Router
 
 from core.exceptions.base import AgentNotFoundError, CapabilityNotFoundError
 from core.logging.logger import logger
-from core.models.domain import Task, TaskResult, TaskStatus
+from typing import Optional
+from core.models.domain import ExecutionContext, Task, TaskResult, TaskStatus
 from registry.agent_registry import AgentRegistry
 from registry.capability_registry import CapabilityRegistry
 
@@ -40,7 +41,7 @@ class SupervisorRouter:
         self.agent_registry = agent_registry
         self.capability_registry = capability_registry
 
-    async def route_task(self, task: Task) -> TaskResult:
+    async def route_task(self, task: Task, context: Optional[ExecutionContext] = None) -> TaskResult:
         """
         Resolves the appropriate agent for a task and invokes its execution.
 
@@ -100,5 +101,5 @@ class SupervisorRouter:
             agent=agent_name,
         )
 
-        result: TaskResult = await agent.execute_task(task)
+        result: TaskResult = await agent.execute_task(task, context)
         return result

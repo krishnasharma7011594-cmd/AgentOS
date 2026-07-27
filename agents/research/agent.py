@@ -26,7 +26,7 @@ from agents.lifecycle import AgentLifecycle
 from agents.research.prompts_v1 import CAPABILITY_TEMPLATES, SYSTEM_CONTEXT
 from core.ai.providers.base import BaseLLMProvider
 from core.logging.logger import logger
-from core.models.domain import AgentCapability, Task, TaskResult
+from core.models.domain import AgentCapability, ExecutionContext, Task, TaskResult
 from core.tools.implementations.web_search import WebSearchTool
 from core.tools.registry import ToolRegistry
 
@@ -94,14 +94,17 @@ class ResearchAgent(AgentLifecycle):
         self.tool_registry.register(WebSearchTool())
         logger.debug("research_agent_tools_registered", agent_id=self.agent_id)
 
-    def _extra_context(self) -> Optional[str]:
+    def _extra_context(self, context: Optional[ExecutionContext] = None) -> Optional[str]:
         """
         Inject research-specific guidance into the ReAct user prompt.
-
-        The SYSTEM_CONTEXT from prompts_v1 nudges the LLM toward well-structured,
-        source-citing answers without overriding the generic ReAct system prompt.
+        Also injects output from previous tasks if context is provided.
         """
-        return SYSTEM_CONTEXT
+        prompt = SYSTEM_CONTEXT
+        if context and context.results:
+            prompt += "\n\nPREVIOUS TASK OUTPUTS:\n"
+            for task_id, res in context.results.items():
+                prompt += f"\n--- Task ({res.agent_id}) ---\n{res.summary}\n"
+        return prompt
 
     def _max_react_steps(self) -> int:
         """
@@ -124,7 +127,7 @@ class ResearchAgent(AgentLifecycle):
     # Task Execution — delegates to AgentLifecycle
     # ------------------------------------------------------------------
 
-    async def execute_task(self, task: Task) -> TaskResult:
+    async def execute_task(self, task: Task, context: Optional[ExecutionContext] = None) -> TaskResult:
         """
         Execute a research task through the ReAct lifecycle.
 
@@ -147,4 +150,4 @@ class ResearchAgent(AgentLifecycle):
             )
 
         # Delegate to the shared AgentLifecycle ReAct loop
-        return await super().execute_task(task)
+        return await super().execute_task(task, context)

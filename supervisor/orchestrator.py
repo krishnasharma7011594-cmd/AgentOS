@@ -10,7 +10,7 @@ Architecture Layer: Supervisor / Orchestrator
 
 from core.exceptions.base import AgentOSError, PlanningError
 from core.logging.logger import logger
-from core.models.domain import ExecutionResult, Goal, TaskResult, TaskStatus
+from core.models.domain import ExecutionContext, ExecutionResult, Goal, TaskResult, TaskStatus
 from registry.agent_registry import AgentRegistry
 from registry.capability_registry import CapabilityRegistry
 from supervisor.planner import SupervisorPlanner
@@ -99,17 +99,48 @@ class SupervisorOrchestrator:
             task_count=len(plan.tasks),
         )
 
-        # Step 2: Route and execute tasks sequentially
+        # Step 2: Route and execute tasks sequentially with dependency validation
         task_results: list[TaskResult] = []
+        context = ExecutionContext(goal_id=goal.id)
+        
         for task in plan.tasks:
             logger.info(
-                "SupervisorOrchestrator: executing task",
+                "SupervisorOrchestrator: evaluating task",
                 task_id=task.id,
                 task_name=task.name,
                 capability=task.required_capability,
             )
+            
+            # Verify dependencies
+            deps_failed = False
+            for dep_id in task.dependencies:
+                dep_result = context.results.get(dep_id)
+                if not dep_result or dep_result.status != TaskStatus.SUCCESS:
+                    deps_failed = True
+                    break
+                    
+            if deps_failed:
+                logger.error(
+                    "SupervisorOrchestrator: task dependencies failed",
+                    task_id=task.id,
+                )
+                result = TaskResult(
+                    task_id=task.id,
+                    agent_id="supervisor",
+                    status=TaskStatus.FAILED,
+                    summary="Skipped due to failed dependencies",
+                    error="Dependency failed",
+                )
+                task_results.append(result)
+                context.results[task.id] = result
+                continue
+                
+            logger.info(
+                "SupervisorOrchestrator: executing task",
+                task_id=task.id,
+            )
             try:
-                result = await self.router.route_task(task)
+                result = await self.router.route_task(task, context)
             except AgentOSError as exc:
                 logger.error(
                     "SupervisorOrchestrator: task routing failed",
@@ -124,6 +155,7 @@ class SupervisorOrchestrator:
                     error=str(exc),
                 )
             task_results.append(result)
+            context.results[task.id] = result
 
         # Step 3: Validate task execution results
         validations = []

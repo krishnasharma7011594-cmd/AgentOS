@@ -60,7 +60,13 @@ class SupervisorReportGenerator:
 
         # Build response text from task summaries
         if successful:
-            response_text = successful[0].summary
+            if len(successful) == 1:
+                response_text = successful[0].summary
+            else:
+                parts = []
+                for idx, r in enumerate(successful, 1):
+                    parts.append(f"### Part {idx} by {r.agent_id}\n{r.summary}")
+                response_text = "\n\n".join(parts)
         else:
             errors = "; ".join(r.error or "unknown error" for r in failed)
             response_text = f"The request could not be completed. Errors encountered: {errors}"

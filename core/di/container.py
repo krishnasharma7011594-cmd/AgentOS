@@ -38,6 +38,7 @@ def _register_agents(
     importing agent modules directly.
     """
     from agents.research.agent import ResearchAgent
+    from agents.coding.agent import CodingAgent
 
     # ResearchAgent receives its LLM provider and shared ToolRegistry via constructor injection
     research_agent = ResearchAgent(
@@ -54,7 +55,21 @@ def _register_agents(
         capabilities=[c.name for c in research_agent.capabilities],
     )
 
-    # TODO: Register CodingAgent, GitHubAgent, and FinanceAgent as their implementations complete.
+    coding_agent = CodingAgent(
+        llm_provider=llm_provider,
+        tool_registry=tool_registry,
+    )
+    agent_registry.register_agent(coding_agent.name, coding_agent)
+    capability_registry.register_agent_capabilities(
+        coding_agent.name,
+        coding_agent.capabilities,
+    )
+    logger.info(
+        "DI: CodingAgent registered",
+        capabilities=[c.name for c in coding_agent.capabilities],
+    )
+
+    # TODO: Register GitHubAgent and FinanceAgent as their implementations complete.
 
 
 def build_orchestrator(app_settings: Settings | None = None) -> SupervisorOrchestrator:

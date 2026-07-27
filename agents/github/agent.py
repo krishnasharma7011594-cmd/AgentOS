@@ -3,7 +3,8 @@
 from agents.base import BaseAgent
 from agents.github.config import GitHubAgentConfig
 from agents.github.memory import GitHubAgentMemory
-from core.models.domain import AgentCapability, Task, TaskResult, TaskStatus
+from typing import Optional
+from core.models.domain import AgentCapability, ExecutionContext, Task, TaskResult, TaskStatus
 
 
 class GitHubAgent(BaseAgent):
@@ -32,7 +33,7 @@ class GitHubAgent(BaseAgent):
     async def initialize(self) -> None:
         pass
 
-    async def execute_task(self, task: Task) -> TaskResult:
+    async def execute_task(self, task: Task, context: Optional[ExecutionContext] = None) -> TaskResult:
         return TaskResult(
             task_id=task.id,
             agent_id=self.name,

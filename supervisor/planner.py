@@ -17,24 +17,29 @@ from core.utils.helpers import generate_uuid
 
 # Deterministic keyword patterns mapped to capability keys
 _CAPABILITY_KEYWORD_MAP: List[Tuple[str, str]] = [
-    (r"\b(summarize|summary|summarization)\b", "summarization"),
-    (r"\b(document|docs|documentation|readme|manual|api ref)\b", "documentation_lookup"),
     (
         r"\b(research|investigate|explain|what is|what are|how does|tell me about|describe)\b",
         "web_research",
     ),
+    (r"\b(code|generate|python|script|program)\b", "code_generation"),
+    (r"\b(review|pr|pull request)\b", "pr_review"),
+    (r"\b(summarize|summary|summarization)\b", "summarization"),
+    (r"\b(document|docs|documentation|readme|manual|api ref)\b", "documentation_lookup"),
 ]
 
 _DEFAULT_CAPABILITY = "web_research"
 
 
-def _infer_capability(description: str) -> str:
-    """Infers the required capability key from goal text using pattern matching."""
+def _infer_capabilities(description: str) -> List[str]:
+    """Infers the required capabilities from goal text using pattern matching."""
     lower = description.lower()
+    capabilities = []
     for pattern, capability in _CAPABILITY_KEYWORD_MAP:
-        if re.search(pattern, lower):
-            return str(capability)
-    return _DEFAULT_CAPABILITY
+        if re.search(pattern, lower) and capability not in capabilities:
+            capabilities.append(str(capability))
+    if not capabilities:
+        capabilities.append(_DEFAULT_CAPABILITY)
+    return capabilities
 
 
 class SupervisorPlanner:
@@ -73,27 +78,33 @@ class SupervisorPlanner:
                 details=f"goal_id={goal.id}",
             )
 
-        capability = _infer_capability(goal.description)
+        capabilities = _infer_capabilities(goal.description)
+        tasks = []
+        previous_task_id = None
 
-        task = Task(
-            id=generate_uuid(),
-            goal_id=goal.id,
-            name=goal.description,
-            description=f"Research and provide a comprehensive answer to: {goal.description}",
-            required_capability=capability,
-            priority="high",
-        )
+        for cap in capabilities:
+            task = Task(
+                id=generate_uuid(),
+                goal_id=goal.id,
+                name=f"{cap} task",
+                description=f"Perform {cap} to help achieve: {goal.description}",
+                required_capability=cap,
+                priority="high",
+                dependencies=[previous_task_id] if previous_task_id else [],
+            )
+            tasks.append(task)
+            previous_task_id = task.id
 
         plan = ExecutionPlan(
             id=generate_uuid(),
             goal_id=goal.id,
-            tasks=[task],
+            tasks=tasks,
         )
 
         logger.info(
             "SupervisorPlanner: plan created",
             plan_id=plan.id,
             task_count=len(plan.tasks),
-            capability=capability,
+            capabilities=capabilities,
         )
         return plan

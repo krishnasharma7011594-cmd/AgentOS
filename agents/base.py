@@ -12,7 +12,7 @@ from typing import List, Optional
 
 from core.ai.providers.base import BaseLLMProvider
 from core.memory.interfaces.base import BaseMemory
-from core.models.domain import AgentCapability, Task, TaskResult
+from core.models.domain import AgentCapability, ExecutionContext, Task, TaskResult
 from core.tools.registry import ToolRegistry
 
 
@@ -58,7 +58,7 @@ class BaseAgent(ABC):
         pass
 
     @abstractmethod
-    async def execute_task(self, task: Task) -> TaskResult:
+    async def execute_task(self, task: Task, context: Optional[ExecutionContext] = None) -> TaskResult:
         """
         Primary execution entry point called by SupervisorRouter.
 

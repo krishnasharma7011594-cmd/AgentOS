@@ -3,7 +3,8 @@
 from agents.base import BaseAgent
 from agents.finance.config import FinanceAgentConfig
 from agents.finance.memory import FinanceAgentMemory
-from core.models.domain import AgentCapability, Task, TaskResult, TaskStatus
+from typing import Optional
+from core.models.domain import AgentCapability, ExecutionContext, Task, TaskResult, TaskStatus
 
 
 class FinanceAgent(BaseAgent):
@@ -32,7 +33,7 @@ class FinanceAgent(BaseAgent):
     async def initialize(self) -> None:
         pass
 
-    async def execute_task(self, task: Task) -> TaskResult:
+    async def execute_task(self, task: Task, context: Optional[ExecutionContext] = None) -> TaskResult:
         return TaskResult(
             task_id=task.id,
             agent_id=self.name,

@@ -114,6 +114,9 @@ class Task(BaseModel):
     required_capability: str = Field(..., description="Capability required to execute this task")
     priority: str = Field(default="medium", description="Task priority: high / medium / low")
     status: TaskStatus = Field(default=TaskStatus.PENDING)
+    dependencies: List[str] = Field(
+        default_factory=list, description="List of task IDs this task depends on"
+    )
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -153,6 +156,20 @@ class TaskResult(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
     error: Optional[str] = Field(default=None, description="Error message if failed")
     completed_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class ExecutionContext(BaseModel):
+    """
+    Lightweight execution context passed between tasks during goal execution.
+    Stores intermediate results to enable multi-agent collaboration.
+
+    Attributes:
+        goal_id: Parent Goal ID.
+        results: Dictionary mapping task IDs to their TaskResult.
+    """
+
+    goal_id: str = Field(..., description="Associated parent Goal ID")
+    results: Dict[str, TaskResult] = Field(default_factory=dict)
 
 
 class ValidationResult(BaseModel):
