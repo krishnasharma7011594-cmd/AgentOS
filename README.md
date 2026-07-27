@@ -164,7 +164,7 @@ black --check .
 ruff check .
 
 # Run static type checker
-mypy core supervisor registry agents workflow task_queue knowledge observability evaluation apps
+mypy .
 ```
 
 ---
