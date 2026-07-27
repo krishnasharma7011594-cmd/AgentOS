@@ -10,7 +10,7 @@ Architecture Layer: Core / Execution
 """
 
 import time
-from typing import Dict, Optional, Any
+from typing import Any, Dict, Optional
 
 from core.models.domain import ExecutionMetrics, TaskResult, TaskStatus
 
