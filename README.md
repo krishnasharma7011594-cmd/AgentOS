@@ -1,6 +1,6 @@
 # AgentOS
 
-> **Notice**: AgentOS is currently under active development. Phases 1 through 4.5 are complete.
+> **Notice**: AgentOS is currently under active development. Phases 1 through 5 are complete.
 
 AgentOS is a production-grade, highly modular, clean-architecture framework designed to evolve into an Agentic AI Operating System. It provides a supervisor-driven, multi-agent runtime where tasks are dynamically planned, routed, validated, and executed using a robust DAG-based `ExecutionGraph`.
 
@@ -21,14 +21,17 @@ This diagram illustrates how the system's core components are decoupled through 
                           │
                           ▼
               [ Supervisor Orchestrator ]
-           (ExecutionGraph & MetricsCollector)
+           (ExecutionGraph, MetricsCollector)
            ┌─────────────┼─────────────┐
            ▼             ▼             ▼
-      [ Planner ]   [ Router ]   [ Validator ]
+      [ Planner ]   [ Router ]   [ Evaluator ]
+                         │             │
+                         │             ▼
+                         │     [ DecisionEngine ]
+                         │             │
+                         ▼             ▼
+               [ CapabilityRegistry ]  (Events)
                          │
-                         ▼
-               [ CapabilityRegistry ]
-                         │  (Dynamic Resolution: Capability → Agent Name)
                          ▼
                 [ AgentRegistry ]
                          │  (Runtime Lookup: Agent Name → Instance)
@@ -78,9 +81,11 @@ This diagram details the chronological journey of a user request as it flows thr
           │                               │
           └───────────────┬───────────────┘
                           ▼
-                  ExecutionContext
+                  TaskEvaluator
                           ▼
-                  MetricsCollector
+                 DecisionEngine (Retry/Skip/Replan)
+                          ▼
+                  ExecutionContext & MetricsCollector
                           ▼
                    ReportBuilder
                           ▼
@@ -96,16 +101,17 @@ This diagram details the chronological journey of a user request as it flows thr
 
 ---
 
-## 🚀 Features Implemented (Up to Phase 4.5)
+## 🚀 Features Implemented (Up to Phase 5)
 
-- **Decomposed Supervisor Architecture**: Separated single-responsibility services (`orchestrator`, `planner`, `router`, `validator`, `report_generator`).
-- **Graph-based Execution Engine**: Replaced sequential loops with `ExecutionGraph` (DAG state machine) that handles dynamic task skipping, dependencies, and execution states.
-- **Telemetry & Reporting**: Embedded `MetricsCollector` to track agent runtime and logic step counts. Uses `ReportBuilder` to synthesize structured `ExecutionReport`s.
+- **Decomposed Supervisor Architecture**: Separated single-responsibility services (`orchestrator`, `planner`, `router`, `validator`, `evaluator`, `decision_engine`, `policies`, `report_generator`).
+- **Adaptive Execution**: `DecisionEngine` evaluates task failures dynamically, enabling automatic retries, skipping non-critical failures, and replanning recovery tasks at runtime.
+- **Graph-based Execution Engine**: Replaced sequential loops with `ExecutionGraph` (DAG state machine) that handles dynamic task skipping, dependencies, execution states, and runtime mutations.
+- **Telemetry & Reporting**: Embedded `MetricsCollector` to track agent runtime, logic step counts, retry rates, and record a full decision audit log (`DecisionLog`). Uses `ReportBuilder` to synthesize structured `ExecutionReport`s.
 - **Dynamic Registries**: `AgentRegistry` and `CapabilityRegistry` support metadata-driven lookup and capability prioritization for runtime resolution.
 - **Provider Abstraction & Factory**: `BaseLLMProvider` interface with operational `GeminiProvider` (`gemini-1.5-flash`) and `GroqProvider` (`llama-3.3-70b-versatile`).
 - **Standardized Modules**: Uniform structure across agents (`ResearchAgent`, `CodingAgent`, etc.) utilizing declarative `METADATA` classes (`AgentMetadata` and `ToolMetadata`).
 - **FastAPI Endpoint Suite**: Full REST endpoints (`POST /chat`, `POST /task`, `GET /health`, `GET /agents`).
-- **Structured Logging & Diagnostics**: Production JSON logging via `structlog`.
+- **Structured Logging & Diagnostics**: Production JSON logging via `structlog` and internal lifecycle event emission (`EventEmitter`).
 - **Developer & DevOps Suite**: Pytest suite, Ruff linting, Black formatting, Mypy type-checking, Docker build, and GitHub Actions CI pipeline.
 
 ---
@@ -225,7 +231,8 @@ mypy .
 - [x] **Phase 2: Functional End-to-End Orchestration** — Full `POST /chat` → `Supervisor` flow.
 - [x] **Phase 3 & 4: Tools & Agents** — Basic tool execution and multi-agent integrations.
 - [x] **Phase 4.5: Architecture Refinement** — Graph-based execution engine (`ExecutionGraph`), DAG plan validation, telemetry/metrics, and metadata-driven capability routing.
-- [ ] **Phase 5: Advanced Planning & RAG** — Dynamic replanning, RAG memory persistence, and web dashboard.
+- [x] **Phase 5: Adaptive Supervisor** — `TaskEvaluator`, `DecisionEngine`, retry policies, graph mutation, replanning, and event emission.
+- [ ] **Phase 6: Advanced Planning & RAG** — Full LLM-driven planning, RAG memory persistence, and web dashboard.
 
 ---
 

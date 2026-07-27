@@ -4,6 +4,10 @@ Supervisor Planner
 Responsible for decomposing a high-level Goal into a structured ExecutionPlan.
 Uses rule-based capability inference to generate tasks for the router.
 
+Phase 5 adds:
+  - create_recovery_tasks(ReplanRequest): generates targeted recovery tasks
+    when the DecisionEngine issues a REPLAN decision.
+
 Architecture Layer: Supervisor / Planner
 """
 
@@ -12,7 +16,7 @@ from typing import List, Tuple
 
 from core.exceptions.base import PlanningError
 from core.logging.logger import logger
-from core.models.domain import ExecutionPlan, Goal, Task
+from core.models.domain import ExecutionPlan, Goal, ReplanRequest, Task
 from core.utils.helpers import generate_uuid
 
 # Deterministic keyword patterns mapped to capability keys
@@ -108,3 +112,50 @@ class SupervisorPlanner:
             capabilities=capabilities,
         )
         return plan
+
+    async def create_recovery_tasks(self, request: ReplanRequest) -> List[Task]:
+        """
+        Generate recovery tasks in response to a REPLAN decision.
+
+        Creates one follow-up task that retries the failing capability
+        using a slightly different, diagnostics-oriented description.
+        This provides a minimal but structured recovery path.
+
+        Args:
+            request: ReplanRequest with context from the failed task.
+
+        Returns:
+            List of new Task objects to insert into the ExecutionGraph.
+        """
+        logger.info(
+            "SupervisorPlanner: generating recovery tasks",
+            goal_id=request.goal_id,
+            failed_task_id=request.failed_task_id,
+            failure_category=(
+                request.evaluation.failure_category.value
+                if request.evaluation.failure_category
+                else "unknown"
+            ),
+        )
+
+        recovery_description = (
+            f"Recovery task for failed task '{request.failed_task_id}'. "
+            f"Previous failure: {request.evaluation.notes}. "
+            f"Context: {request.context_summary[:300]}"
+        )
+
+        recovery_task = Task(
+            id=generate_uuid(),
+            goal_id=request.goal_id,
+            name="Recovery: web_research",
+            description=recovery_description,
+            required_capability="web_research",
+            priority="high",
+            dependencies=[],
+        )
+
+        logger.info(
+            "SupervisorPlanner: recovery task created",
+            recovery_task_id=recovery_task.id,
+        )
+        return [recovery_task]

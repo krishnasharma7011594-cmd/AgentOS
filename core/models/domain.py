@@ -13,6 +13,14 @@ Phase 4.5 adds:
   - ExecutionMetrics for structured telemetry
   - ExecutionReport as rich internal report model
   - PlanValidationResult for plan-level validation
+Phase 5 adds:
+  - FailureCategory for structured failure classification
+  - TaskEvaluation for rich structured task outcome assessment
+  - DecisionType, GraphMutation, Decision for Decision Engine outputs
+  - DecisionContext as the pure input model to DecisionEngine
+  - ReplanRequest for structured replanning
+  - ExecutionEvent for event-driven observability
+  - DecisionLogEntry and DecisionLog for full audit trail
 
 Architecture Layer: Core / Models
 """
@@ -424,6 +432,213 @@ class ExecutionResult(BaseModel):
         description="Rich structured execution report (Phase 4.5+)",
     )
     completed_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+# ---------------------------------------------------------------------------
+# Phase 5 — Adaptive Supervisor Models
+# ---------------------------------------------------------------------------
+
+
+class FailureCategory(str, Enum):
+    """
+    Classification of why a task failed.
+
+    Used by TaskEvaluator to classify failure modes and by RetryPolicy
+    to determine appropriate supervisor decisions.
+    """
+
+    TOOL_FAILURE = "tool_failure"
+    LLM_FAILURE = "llm_failure"
+    VALIDATION_FAILURE = "validation_failure"
+    TIMEOUT = "timeout"
+    DEPENDENCY_FAILURE = "dependency_failure"
+    CAPABILITY_UNAVAILABLE = "capability_unavailable"
+    USER_ERROR = "user_error"
+    UNKNOWN = "unknown"
+
+
+class TaskEvaluation(BaseModel):
+    """
+    Structured outcome produced by TaskEvaluator after inspecting a TaskResult.
+
+    Replaces simple boolean validation with a rich model that enables the
+    DecisionEngine to make nuanced routing decisions.
+
+    Attributes:
+        task_id:           Associated Task ID.
+        is_success:        True when the task completed successfully.
+        is_partial:        True when the task produced usable but incomplete output.
+        failure_category:  Classified failure mode (None on success).
+        downstream_impact: Human-readable note on how failure affects dependents.
+        notes:             Additional evaluator commentary.
+    """
+
+    task_id: str = Field(..., description="Associated Task ID")
+    is_success: bool = Field(..., description="True when task completed successfully")
+    is_partial: bool = Field(default=False, description="Partial success produced usable output")
+    failure_category: Optional[FailureCategory] = Field(
+        default=None,
+        description="Classified failure mode; None on success",
+    )
+    downstream_impact: str = Field(
+        default="",
+        description="Human-readable note on downstream impact of failure",
+    )
+    notes: str = Field(default="", description="Additional evaluator commentary")
+
+
+class DecisionType(str, Enum):
+    """
+    Enumeration of decisions the DecisionEngine may return.
+
+    Each value drives a distinct branch in the Supervisor execution loop.
+    """
+
+    CONTINUE = "continue"
+    RETRY = "retry"
+    SKIP = "skip"
+    REPLAN = "replan"
+    TERMINATE = "terminate"
+
+
+class GraphMutation(BaseModel):
+    """
+    Descriptor of a requested change to the live ExecutionGraph.
+
+    Produced as part of a Decision and applied by the Orchestrator (not the
+    DecisionEngine). Keeps the DecisionEngine pure — it describes what should
+    change without performing mutations itself.
+
+    Attributes:
+        new_tasks:       New Task objects to register in the graph.
+        before_task_ids: Task IDs that must depend on the new tasks once inserted.
+    """
+
+    new_tasks: List["Task"] = Field(
+        default_factory=list,
+        description="New tasks to insert into the execution graph",
+    )
+    before_task_ids: List[str] = Field(
+        default_factory=list,
+        description="Existing unfinished task IDs that must wait for new_tasks to complete",
+    )
+
+
+class Decision(BaseModel):
+    """
+    Structured decision produced by the DecisionEngine.
+
+    Consumed by the Supervisor Orchestrator to determine the next action
+    for a task after its execution completes.
+
+    Attributes:
+        decision_type: The chosen action.
+        reason:        Human-readable explanation for observability and logging.
+        mutation:      Optional graph mutation request (only populated for REPLAN).
+    """
+
+    decision_type: DecisionType = Field(..., description="Chosen supervisor action")
+    reason: str = Field(..., description="Explanation of why this decision was made")
+    mutation: Optional[GraphMutation] = Field(
+        default=None,
+        description="Graph mutation to apply (only for REPLAN decisions)",
+    )
+
+
+class DecisionContext(BaseModel):
+    """
+    Pure input model passed to DecisionEngine.make_decision().
+
+    Bundles everything the DecisionEngine needs to make a decision without
+    requiring direct access to the graph or orchestrator internals.
+
+    Attributes:
+        task_id:       The task being evaluated.
+        evaluation:    Structured TaskEvaluation for this task.
+        attempt_count: Number of times this task has already been attempted.
+        pending_count: Number of tasks still pending in the graph.
+        failed_count:  Number of tasks already failed in the graph.
+    """
+
+    task_id: str = Field(..., description="Task being evaluated")
+    evaluation: TaskEvaluation = Field(..., description="Structured evaluation result")
+    attempt_count: int = Field(default=0, description="Number of prior attempts for this task")
+    pending_count: int = Field(default=0, description="Remaining pending tasks in the graph")
+    failed_count: int = Field(default=0, description="Total failed tasks so far")
+
+
+class ReplanRequest(BaseModel):
+    """
+    Structured context passed to the Planner when a REPLAN decision is made.
+
+    Gives the Planner enough context to generate additional tasks without
+    inferring everything from scratch.
+
+    Attributes:
+        goal_id:        Parent Goal ID.
+        failed_task_id: The task that triggered replanning.
+        evaluation:     The TaskEvaluation that caused the REPLAN decision.
+        context_summary: Human-readable summary of the execution context so far.
+    """
+
+    goal_id: str = Field(..., description="Parent Goal ID")
+    failed_task_id: str = Field(..., description="Task ID that triggered the replan")
+    evaluation: TaskEvaluation = Field(..., description="Evaluation that caused REPLAN")
+    context_summary: str = Field(
+        default="",
+        description="Summary of prior execution context for the planner",
+    )
+
+
+class EventType(str, Enum):
+    """Enumeration of observable execution lifecycle events."""
+
+    TASK_STARTED = "task_started"
+    TASK_COMPLETED = "task_completed"
+    TASK_FAILED = "task_failed"
+    TASK_SKIPPED = "task_skipped"
+    TASK_RETRIED = "task_retried"
+    TASK_INSERTED = "task_inserted"
+    EXECUTION_FINISHED = "execution_finished"
+
+
+class ExecutionEvent(BaseModel):
+    """
+    Observable event emitted during the execution lifecycle.
+
+    Captured by EventEmitter, logged, and stored in the execution metrics.
+    Future phases may introduce subscribers to this event bus.
+
+    Attributes:
+        event_type: Type of lifecycle event.
+        task_id:    Associated task ID (may be None for goal-level events).
+        details:    Optional human-readable detail string.
+        occurred_at: Timestamp of the event.
+    """
+
+    event_type: EventType = Field(..., description="Type of lifecycle event")
+    task_id: Optional[str] = Field(default=None, description="Associated task ID")
+    details: str = Field(default="", description="Optional detail string")
+    occurred_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class DecisionLogEntry(BaseModel):
+    """
+    Single entry in the Supervisor decision audit trail.
+
+    Attributes:
+        task_id:       The task this decision pertains to.
+        decision:      The Decision object produced by DecisionEngine.
+        evaluation:    The TaskEvaluation that was used as input.
+        attempt_count: Attempt number at the time of the decision.
+        logged_at:     Timestamp of the decision.
+    """
+
+    task_id: str
+    decision: Decision
+    evaluation: TaskEvaluation
+    attempt_count: int = Field(default=0)
+    logged_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 # ---------------------------------------------------------------------------

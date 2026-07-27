@@ -10,12 +10,16 @@ to execute based on dependency satisfaction.
 Execution is currently sequential. The graph abstraction prepares the
 architecture for future DAG / parallel execution without changing public APIs.
 
+Phase 5 adds:
+  - apply_mutation(GraphMutation): safe dynamic task insertion with cycle detection.
+  - mark_task_ready(task_id): re-queue a FAILED task for retry.
+
 Architecture Layer: Core / Execution
 """
 
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Set
 
-from core.models.domain import ExecutionPlan, Task, TaskResult, TaskStatus
+from core.models.domain import ExecutionPlan, GraphMutation, Task, TaskResult, TaskStatus
 
 # Valid state transitions:  current → allowed next states
 _VALID_TRANSITIONS: Dict[TaskStatus, List[TaskStatus]] = {
@@ -209,6 +213,112 @@ class ExecutionGraph:
             s in (TaskStatus.SUCCESS, TaskStatus.FAILED, TaskStatus.SKIPPED)
             for s in self._statuses.values()
         )
+
+    # ------------------------------------------------------------------
+    # Phase 5 — Dynamic Graph Mutation
+    # ------------------------------------------------------------------
+
+    def mark_task_ready(self, task_id: str) -> None:
+        """
+        Force a FAILED task back to READY for retry.
+
+        Used by the Orchestrator when the DecisionEngine returns RETRY.
+        """
+        if self._statuses.get(task_id) != TaskStatus.FAILED:
+            raise InvalidTaskTransitionError(
+                f"Task '{task_id}' cannot be re-queued for retry; "
+                f"current status: {self._statuses.get(task_id)}"
+            )
+        self._statuses[task_id] = TaskStatus.READY
+        # Remove any stale result so the next execution starts clean
+        self._results.pop(task_id, None)
+
+    def apply_mutation(self, mutation: GraphMutation) -> None:
+        """
+        Safely insert new tasks into the live graph.
+
+        Each new task in ``mutation.new_tasks`` is registered in the graph
+        with PENDING status (or READY when it has no dependencies).
+        Every task in ``mutation.before_task_ids`` is updated to depend on
+        all newly inserted tasks so it cannot start until they complete.
+
+        Raises:
+            ValueError: If any ``before_task_ids`` task is already in a
+                terminal state (cannot re-block finished work).
+            ValueError: If the insertion would introduce a circular dependency.
+        """
+        if not mutation.new_tasks:
+            return
+
+        new_ids = [t.id for t in mutation.new_tasks]
+
+        # Guard: cannot block a task that already finished
+        terminal = {TaskStatus.SUCCESS, TaskStatus.FAILED, TaskStatus.SKIPPED}
+        for tid in mutation.before_task_ids:
+            if self._statuses.get(tid) in terminal:
+                raise ValueError(
+                    f"Cannot block task '{tid}': it is already in a terminal state "
+                    f"({self._statuses[tid].value})."
+                )
+
+        # Register new tasks
+        for task in mutation.new_tasks:
+            self._tasks[task.id] = task
+            self._statuses[task.id] = (
+                TaskStatus.READY if not task.dependencies else TaskStatus.PENDING
+            )
+
+        # Wire dependencies: tasks in before_task_ids must wait for new tasks
+        for tid in mutation.before_task_ids:
+            existing_task = self._tasks[tid]
+            updated_deps = list(existing_task.dependencies) + new_ids
+            # Rebuild a new Task with the patched dependency list
+            self._tasks[tid] = existing_task.model_copy(
+                update={"dependencies": updated_deps, "status": TaskStatus.PENDING}
+            )
+            # Reset status so it won't run until new deps are met
+            self._statuses[tid] = TaskStatus.PENDING
+
+        # Cycle detection via DFS
+        if self._has_cycle():
+            # Roll back: remove new tasks and restore before_task_ids deps
+            for task in mutation.new_tasks:
+                del self._tasks[task.id]
+                del self._statuses[task.id]
+            for tid in mutation.before_task_ids:
+                original_task = self._tasks[tid]
+                restored_deps = [d for d in original_task.dependencies if d not in new_ids]
+                self._tasks[tid] = original_task.model_copy(update={"dependencies": restored_deps})
+                self._statuses[tid] = TaskStatus.PENDING
+            raise ValueError(
+                "apply_mutation rejected: inserting the new tasks would create "
+                "a circular dependency in the ExecutionGraph."
+            )
+
+    def _has_cycle(self) -> bool:
+        """DFS-based cycle detection over the current task graph."""
+
+        # color dict unused: DFS instead uses visited/stack sets for clarity
+        def dfs(node: str, visited: Set[str], stack: Set[str]) -> bool:
+            visited.add(node)
+            stack.add(node)
+            for dep in self._tasks[node].dependencies:
+                if dep not in self._tasks:
+                    continue
+                if dep not in visited:
+                    if dfs(dep, visited, stack):
+                        return True
+                elif dep in stack:
+                    return True
+            stack.discard(node)
+            return False
+
+        visited_global: Set[str] = set()
+        for tid in list(self._tasks):
+            if tid not in visited_global:
+                if dfs(tid, visited_global, set()):
+                    return True
+        return False
 
     # ------------------------------------------------------------------
     # Introspection

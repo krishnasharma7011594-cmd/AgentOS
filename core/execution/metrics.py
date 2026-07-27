@@ -6,13 +6,24 @@ Collects and aggregates execution telemetry during one goal lifecycle.
 Records per-task timing and extracts tool call / reasoning step counts
 from TaskResult metadata produced by the ReAct lifecycle.
 
+Phase 5 adds:
+  - retry_count, inserted_task_count tracking
+  - failure_category_counts distribution
+  - DecisionLog for full supervisor decision audit trail
+
 Architecture Layer: Core / Execution
 """
 
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
-from core.models.domain import ExecutionMetrics, TaskResult, TaskStatus
+from core.models.domain import (
+    DecisionLogEntry,
+    ExecutionMetrics,
+    FailureCategory,
+    TaskResult,
+    TaskStatus,
+)
 
 
 class MetricsCollector:
@@ -36,6 +47,11 @@ class MetricsCollector:
         self._task_starts: Dict[str, float] = {}  # task_id → start time
         self._agent_times: Dict[str, float] = {}  # agent_id → cumulative ms
         self._results: list[TaskResult] = []
+        # Phase 5 adaptive supervisor counters
+        self._retry_count: int = 0
+        self._inserted_task_count: int = 0
+        self._failure_category_counts: Dict[str, int] = {}
+        self._decision_log: List[DecisionLogEntry] = []
 
     # ------------------------------------------------------------------
     # Goal lifecycle
@@ -104,6 +120,43 @@ class MetricsCollector:
             total_tool_calls=tool_calls,
             total_reasoning_steps=reasoning_steps,
         )
+
+    # ------------------------------------------------------------------
+    # Phase 5 — Adaptive Supervisor Tracking
+    # ------------------------------------------------------------------
+
+    def record_retry(self, task_id: str, category: FailureCategory) -> None:
+        """Record that a task was retried due to a classified failure."""
+        self._retry_count += 1
+        key = category.value
+        self._failure_category_counts[key] = self._failure_category_counts.get(key, 0) + 1
+
+    def record_inserted_task(self, task_id: str) -> None:
+        """Record that a new task was dynamically inserted into the graph."""
+        self._inserted_task_count += 1
+
+    def record_decision(self, entry: DecisionLogEntry) -> None:
+        """Append a supervisor decision to the DecisionLog."""
+        self._decision_log.append(entry)
+
+    @property
+    def retry_count(self) -> int:
+        """Total number of retries issued during execution."""
+        return self._retry_count
+
+    @property
+    def inserted_task_count(self) -> int:
+        """Total number of tasks dynamically inserted via replanning."""
+        return self._inserted_task_count
+
+    @property
+    def failure_category_counts(self) -> Dict[str, int]:
+        """Failure category distribution (category value → count)."""
+        return dict(self._failure_category_counts)
+
+    def get_decision_log(self) -> List[DecisionLogEntry]:
+        """Return the full ordered supervisor decision audit trail."""
+        return list(self._decision_log)
 
 
 # ---------------------------------------------------------------------------
