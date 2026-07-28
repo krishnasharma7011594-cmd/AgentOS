@@ -110,7 +110,9 @@ class ContextAssemblyPolicy(BaseModel):
 
     max_items: int = Field(default=10, description="Maximum items in the final bundle.")
     min_relevance_score: float = Field(default=0.0, description="Minimum score required.")
-    enforce_deduplication: bool = Field(default=True, description="Whether to deduplicate by memory_id.")
+    enforce_deduplication: bool = Field(
+        default=True, description="Whether to deduplicate by memory_id."
+    )
 
 
 class ContextRequest(BaseModel):
