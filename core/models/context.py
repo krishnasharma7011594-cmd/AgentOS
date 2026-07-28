@@ -71,7 +71,7 @@ class ContextItem(BaseModel):
     source: ContextSource = Field(..., description="Origin of the knowledge.")
     priority: ContextPriority = Field(..., description="Importance level.")
     reason: ContextReason = Field(..., description="Why this item is relevant.")
-    relevance_score: float = Field(0.0, description="Normalized score [0.0, 1.0].")
+    relevance_score: float = Field(default=0.0, description="Normalized score [0.0, 1.0].")
 
     # Provenance fields for explainability and debugging
     memory_id: Optional[str] = Field(None, description="Original MemoryRecord ID.")
@@ -108,9 +108,9 @@ class ContextSelectionPolicy(BaseModel):
 class ContextAssemblyPolicy(BaseModel):
     """Rules dictating *how* a bundle is constructed."""
 
-    max_items: int = Field(10, description="Maximum items in the final bundle.")
-    min_relevance_score: float = Field(0.0, description="Minimum score required.")
-    enforce_deduplication: bool = Field(True, description="Whether to deduplicate by memory_id.")
+    max_items: int = Field(default=10, description="Maximum items in the final bundle.")
+    min_relevance_score: float = Field(default=0.0, description="Minimum score required.")
+    enforce_deduplication: bool = Field(default=True, description="Whether to deduplicate by memory_id.")
 
 
 class ContextRequest(BaseModel):

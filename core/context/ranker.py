@@ -7,7 +7,7 @@ Prioritizes critical sources like Execution History and Reflections.
 Architecture Layer: Core / Context
 """
 
-from typing import List, Set
+from typing import List, Set, Tuple
 
 from core.models.context import ContextItem, ContextPriority
 
@@ -47,7 +47,7 @@ class ContextRanker:
         # Sort
         # Score = relevance_score * priority_weight
         # We also use retrieval_timestamp as a tie-breaker (newer is better)
-        def sort_key(itm: ContextItem) -> tuple:
+        def sort_key(itm: ContextItem) -> Tuple[float, float]:
             weight = self._priority_weights.get(itm.priority, 1.0)
             score = itm.relevance_score * weight
             return (score, itm.retrieval_timestamp)
