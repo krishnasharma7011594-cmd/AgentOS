@@ -24,8 +24,10 @@ Phase 5 (Adaptive Supervisor):
 Architecture Layer: Supervisor / Orchestrator
 """
 
+from core.context.engine import ContextEngine
 from core.exceptions.base import AgentOSError, PlanningError
 from core.execution.events import EventEmitter
+from core.models.context import PlannerInput
 from core.execution.graph import ExecutionGraph
 from core.execution.metrics import MetricsCollector
 from core.logging.logger import logger
@@ -93,6 +95,7 @@ class SupervisorOrchestrator:
         report_generator: SupervisorReportGenerator,
         retry_policy: RetryPolicy | None = None,
         memory_service: MemoryService | None = None,
+        context_engine: ContextEngine | None = None,
     ) -> None:
         self.agent_registry = agent_registry
         self.capability_registry = capability_registry
@@ -101,6 +104,7 @@ class SupervisorOrchestrator:
         self.validator = validator
         self.report_generator = report_generator
         self._memory_service = memory_service
+        self._context_engine = context_engine
         self._evaluator = TaskEvaluator()
         self._decision_engine = DecisionEngine(retry_policy=retry_policy or RetryPolicy())
         self._reflection_engine = ReflectionEngine()
@@ -124,9 +128,26 @@ class SupervisorOrchestrator:
             description=goal.description,
         )
 
-        # ── Step 1: Decompose goal into execution plan ────────────────────
+        # ── Step 1: Generate Planner Context & Decompose Goal ─────────────
+        planner_context = None
+        if self._context_engine:
+            from core.models.context import ContextRequest, ContextScope
+            planner_context = self._context_engine.build_context(
+                ContextRequest(
+                    goal_id=goal.id,
+                    goal_description=goal.description,
+                    scope=ContextScope.PLANNER,
+                )
+            )
+
+        planner_input = PlannerInput(
+            goal_id=goal.id,
+            goal_description=goal.description,
+            context=planner_context,
+        )
+
         try:
-            plan = await self.planner.create_plan(goal)
+            plan = await self.planner.create_plan(planner_input)
         except PlanningError as exc:
             logger.error(
                 "SupervisorOrchestrator: planning failed",
@@ -161,7 +182,18 @@ class SupervisorOrchestrator:
         collector.start_goal()
         emitter = EventEmitter(goal_id=goal.id)
 
-        context = ExecutionContext(goal_id=goal.id)
+        agent_context = None
+        if self._context_engine:
+            from core.models.context import ContextRequest, ContextScope
+            agent_context = self._context_engine.build_context(
+                ContextRequest(
+                    goal_id=goal.id,
+                    goal_description=goal.description,
+                    scope=ContextScope.AGENT,
+                )
+            )
+
+        context = ExecutionContext(goal_id=goal.id, context_bundle=agent_context)
         task_results: list[TaskResult] = []
 
         # attempt_counts tracks how many times each task has been retried
@@ -493,11 +525,25 @@ class SupervisorOrchestrator:
             context_summary = "; ".join(
                 f"{tid}: {r.status.value}" for tid, r in context.results.items()
             )
+            replan_context = None
+            if self._context_engine:
+                from core.models.context import ContextRequest, ContextScope
+                replan_context = self._context_engine.build_context(
+                    ContextRequest(
+                        goal_id=goal.id,
+                        goal_description=goal.description,
+                        task_id=task.id,
+                        task_description=task.description,
+                        scope=ContextScope.SUPERVISOR,
+                    )
+                )
+
             replan_request = ReplanRequest(
                 goal_id=goal.id,
                 failed_task_id=task.id,
                 evaluation=evaluation,
                 context_summary=context_summary,
+                context_bundle=replan_context,
             )
             logger.info(
                 "SupervisorOrchestrator: replanning",

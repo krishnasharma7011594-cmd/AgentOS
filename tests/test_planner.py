@@ -2,6 +2,7 @@
 
 import pytest
 
+from core.models.context import PlannerInput
 from core.models.domain import Goal
 from core.utils.helpers import generate_uuid
 from supervisor.planner import SupervisorPlanner, _infer_capabilities
@@ -9,6 +10,11 @@ from supervisor.planner import SupervisorPlanner, _infer_capabilities
 
 def make_goal(description: str) -> Goal:
     return Goal(id=generate_uuid(), description=description)
+
+
+def make_planner_input(description: str) -> PlannerInput:
+    goal = make_goal(description)
+    return PlannerInput(goal_id=goal.id, goal_description=goal.description)
 
 
 def test_infer_capability_web_research() -> None:
@@ -36,10 +42,10 @@ def test_infer_capability_default() -> None:
 @pytest.mark.asyncio
 async def test_planner_creates_plan() -> None:
     planner = SupervisorPlanner()
-    goal = make_goal("Research LangGraph and generate a python example")
-    plan = await planner.create_plan(goal)
+    planner_input = make_planner_input("Research LangGraph and generate a python example")
+    plan = await planner.create_plan(planner_input)
 
-    assert plan.goal_id == goal.id
+    assert plan.goal_id == planner_input.goal_id
     assert len(plan.tasks) == 2
     assert plan.tasks[0].required_capability == "web_research"
     assert plan.tasks[1].required_capability == "code_generation"
@@ -52,6 +58,6 @@ async def test_planner_empty_goal_raises() -> None:
     from core.exceptions.base import PlanningError
 
     planner = SupervisorPlanner()
-    goal = make_goal("   ")
+    planner_input = make_planner_input("   ")
     with pytest.raises(PlanningError):
-        await planner.create_plan(goal)
+        await planner.create_plan(planner_input)

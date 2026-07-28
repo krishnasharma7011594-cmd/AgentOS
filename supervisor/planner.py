@@ -16,6 +16,7 @@ from typing import List, Tuple
 
 from core.exceptions.base import PlanningError
 from core.logging.logger import logger
+from core.models.context import PlannerInput
 from core.models.domain import ExecutionPlan, Goal, ReplanRequest, Task
 from core.utils.helpers import generate_uuid
 
@@ -57,12 +58,12 @@ class SupervisorPlanner:
     TODO: Replace deterministic keyword planner with LLM-driven planning in Phase 3.
     """
 
-    async def create_plan(self, goal: Goal) -> ExecutionPlan:
+    async def create_plan(self, input_data: PlannerInput) -> ExecutionPlan:
         """
         Decomposes a Goal into an ordered ExecutionPlan containing Task items.
 
         Args:
-            goal: Target user goal.
+            input_data: PlannerInput containing the goal description and context.
 
         Returns:
             ExecutionPlan: Sequenced plan of tasks.
@@ -72,26 +73,30 @@ class SupervisorPlanner:
         """
         logger.info(
             "SupervisorPlanner: creating plan",
-            goal_id=goal.id,
-            description=goal.description,
+            goal_id=input_data.goal_id,
+            description=input_data.goal_description,
+            has_context=input_data.context is not None and not input_data.context.is_empty,
         )
 
-        if not goal.description.strip():
+        if not input_data.goal_description.strip():
             raise PlanningError(
                 "Cannot create plan: goal description is empty.",
-                details=f"goal_id={goal.id}",
+                details=f"goal_id={input_data.goal_id}",
             )
 
-        capabilities = _infer_capabilities(goal.description)
+        # In LLM-driven planning (Phase 3+), we would serialize the ContextBundle here
+        # into a prompt string and pass it to the LLM layer.
+        
+        capabilities = _infer_capabilities(input_data.goal_description)
         tasks = []
         previous_task_id = None
 
         for cap in capabilities:
             task = Task(
                 id=generate_uuid(),
-                goal_id=goal.id,
+                goal_id=input_data.goal_id,
                 name=f"{cap} task",
-                description=f"Perform {cap} to help achieve: {goal.description}",
+                description=f"Perform {cap} to help achieve: {input_data.goal_description}",
                 required_capability=cap,
                 priority="high",
                 dependencies=[previous_task_id] if previous_task_id else [],
@@ -101,7 +106,7 @@ class SupervisorPlanner:
 
         plan = ExecutionPlan(
             id=generate_uuid(),
-            goal_id=goal.id,
+            goal_id=input_data.goal_id,
             tasks=tasks,
         )
 

@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from core.models.context import ContextBundle
 from core.models.reflection import ReflectionReport
 from core.utils.helpers import generate_uuid
 
@@ -297,6 +298,9 @@ class ExecutionContext(BaseModel):
 
     goal_id: str = Field(..., description="Associated parent Goal ID")
     results: Dict[str, TaskResult] = Field(default_factory=dict)
+    context_bundle: Optional[ContextBundle] = Field(
+        default=None, description="Immutable knowledge context supplied by the Supervisor"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -598,6 +602,10 @@ class ReplanRequest(BaseModel):
     context_summary: str = Field(
         default="",
         description="Summary of prior execution context for the planner",
+    )
+    context_bundle: Optional[ContextBundle] = Field(
+        default=None,
+        description="Context supplied by the Supervisor during replanning",
     )
 
 

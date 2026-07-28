@@ -23,6 +23,17 @@ from core.logging.logger import logger
 from core.memory.providers.vector import VectorMemoryProvider
 from core.memory.repository import DefaultKnowledgeRepository
 from core.memory.service import MemoryService
+from core.models.context import ContextAssemblyPolicy
+from core.context.assembler import ContextAssembler
+from core.context.engine import ContextEngine
+from core.context.ranker import ContextRanker
+from core.context.resolver import ContextResolver
+from core.context.strategies.implementations import (
+    ExecutionHistoryStrategy,
+    KnowledgeContextStrategy,
+    ReflectionContextStrategy,
+    SemanticContextStrategy,
+)
 from core.tools.implementations.web_search import WebSearchTool
 from core.tools.registry import ToolRegistry
 from registry.agent_registry import AgentRegistry
@@ -138,7 +149,27 @@ def build_orchestrator(app_settings: Settings | None = None) -> SupervisorOrches
     )
     logger.info("DI: MemoryService registered (VectorMemoryProvider + DeterministicEmbeddings)")
 
-    # 6. Assemble orchestrator
+    # 6. Context subsystem (Phase 8)
+    context_strategies = [
+        ExecutionHistoryStrategy(),
+        ReflectionContextStrategy(),
+        KnowledgeContextStrategy(),
+        SemanticContextStrategy(),
+    ]
+    context_resolver = ContextResolver(
+        memory_service=memory_service,
+        strategies=context_strategies,
+    )
+    context_ranker = ContextRanker()
+    context_assembler = ContextAssembler(default_policy=ContextAssemblyPolicy())
+    context_engine = ContextEngine(
+        resolver=context_resolver,
+        ranker=context_ranker,
+        assembler=context_assembler,
+    )
+    logger.info("DI: ContextEngine registered with 4 strategies")
+
+    # 7. Wire up final orchestrator
     orchestrator = SupervisorOrchestrator(
         agent_registry=agent_registry,
         capability_registry=capability_registry,
@@ -147,6 +178,7 @@ def build_orchestrator(app_settings: Settings | None = None) -> SupervisorOrches
         validator=validator,
         report_generator=report_generator,
         memory_service=memory_service,
+        context_engine=context_engine,
     )
 
     logger.info(
