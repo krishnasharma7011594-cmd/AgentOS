@@ -234,7 +234,8 @@ mypy .
 - [x] Phase 4.5: Metadata, Observability & Validation
 - [x] Phase 5: Adaptive Supervisor
 - [x] Phase 6: Reflection Layer
-- [ ] **Phase 7: Advanced Planning & RAG** — Full LLM-driven planning, RAG memory persistence, and web dashboard.
+- [x] Phase 7: Memory & Knowledge Subsystem — Provider-agnostic memory with semantic search, KnowledgeRepository, MemoryService, and automatic execution/reflection persistence.
+- [ ] **Phase 8: Agent-Side Retrieval & RAG** — Agent-accessible memory retrieval, RAG-augmented planning, and web dashboard.
 
 ---
 

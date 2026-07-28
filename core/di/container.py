@@ -8,14 +8,21 @@ the decomposed Supervisor subcomponents into a unified SupervisorOrchestrator.
 Phase 4.5: Registers AgentMetadata alongside agents; passes CapabilityRegistry
 to SupervisorValidator for plan-level capability checking.
 
+Phase 7: Registers EmbeddingProvider, VectorMemoryProvider, DefaultKnowledgeRepository,
+and MemoryService. Injects MemoryService into SupervisorOrchestrator.
+
 Architecture Layer: Core / DI
 """
 
+from core.ai.embeddings.deterministic import DeterministicEmbeddingProvider
 from core.ai.providers.base import BaseLLMProvider
 from core.ai.providers.factory import build_llm_provider
 from core.config.settings import Settings
 from core.config.settings import settings as _global_settings
 from core.logging.logger import logger
+from core.memory.providers.vector import VectorMemoryProvider
+from core.memory.repository import DefaultKnowledgeRepository
+from core.memory.service import MemoryService
 from core.tools.implementations.web_search import WebSearchTool
 from core.tools.registry import ToolRegistry
 from registry.agent_registry import AgentRegistry
@@ -121,7 +128,17 @@ def build_orchestrator(app_settings: Settings | None = None) -> SupervisorOrches
     validator = SupervisorValidator(capability_registry=capability_registry)
     report_generator = SupervisorReportGenerator()
 
-    # 5. Assemble orchestrator
+    # 5. Memory subsystem (Phase 7)
+    embedding_provider = DeterministicEmbeddingProvider()
+    memory_provider = VectorMemoryProvider()
+    knowledge_repository = DefaultKnowledgeRepository(provider=memory_provider)
+    memory_service = MemoryService(
+        repository=knowledge_repository,
+        embedding_provider=embedding_provider,
+    )
+    logger.info("DI: MemoryService registered (VectorMemoryProvider + DeterministicEmbeddings)")
+
+    # 6. Assemble orchestrator
     orchestrator = SupervisorOrchestrator(
         agent_registry=agent_registry,
         capability_registry=capability_registry,
@@ -129,6 +146,7 @@ def build_orchestrator(app_settings: Settings | None = None) -> SupervisorOrches
         router=router,
         validator=validator,
         report_generator=report_generator,
+        memory_service=memory_service,
     )
 
     logger.info(

@@ -29,6 +29,7 @@ from core.execution.events import EventEmitter
 from core.execution.graph import ExecutionGraph
 from core.execution.metrics import MetricsCollector
 from core.logging.logger import logger
+from core.memory.service import MemoryService
 from core.models.domain import (
     Decision,
     DecisionContext,
@@ -91,6 +92,7 @@ class SupervisorOrchestrator:
         validator: SupervisorValidator,
         report_generator: SupervisorReportGenerator,
         retry_policy: RetryPolicy | None = None,
+        memory_service: MemoryService | None = None,
     ) -> None:
         self.agent_registry = agent_registry
         self.capability_registry = capability_registry
@@ -98,10 +100,13 @@ class SupervisorOrchestrator:
         self.router = router
         self.validator = validator
         self.report_generator = report_generator
+        self._memory_service = memory_service
         self._evaluator = TaskEvaluator()
         self._decision_engine = DecisionEngine(retry_policy=retry_policy or RetryPolicy())
         self._reflection_engine = ReflectionEngine()
-        logger.info("SupervisorOrchestrator: initialized (Phase 5+6 — Adaptive+Reflective)")
+        logger.info(
+            "SupervisorOrchestrator: initialized (Phase 5+6+7 — Adaptive+Reflective+Memory)"
+        )
 
     async def execute_goal(self, goal: Goal) -> ExecutionResult:
         """
@@ -300,6 +305,10 @@ class SupervisorOrchestrator:
             reflection_report = self._reflection_engine.reflect(execution_result.report)
             execution_result.report.reflection_report = reflection_report
 
+        # ── Step 9: Persist to Memory subsystem (Phase 7) ─────────────────
+        if self._memory_service:
+            self._persist_to_memory(goal, execution_result, metrics)
+
         logger.info(
             "SupervisorOrchestrator: execution complete",
             goal_id=goal.id,
@@ -315,6 +324,80 @@ class SupervisorOrchestrator:
             ),
         )
         return execution_result
+
+    def _persist_to_memory(
+        self,
+        goal: Goal,
+        execution_result: ExecutionResult,
+        metrics: object,
+    ) -> None:
+        """
+        Persist execution summary and reflection artifacts to MemoryService.
+
+        Called after execution + reflection complete. Never raises — any
+        storage failure is logged and suppressed to preserve execution purity.
+        """
+        assert self._memory_service is not None  # guarded by caller
+        svc = self._memory_service
+
+        try:
+            # Persist execution summary
+            exec_summary = (
+                execution_result.response
+                if isinstance(execution_result.response, str)
+                else str(execution_result.response)
+            )
+            exec_attrs = {
+                "execution_time_ms": getattr(metrics, "execution_time_ms", None),
+                "total_tasks": getattr(metrics, "total_tasks", None),
+                "failed_tasks": getattr(metrics, "failed_tasks", None),
+            }
+            svc.store_execution(
+                goal_id=goal.id,
+                summary=exec_summary,
+                status=execution_result.status,
+                attributes={k: v for k, v in exec_attrs.items() if v is not None},
+            )
+            logger.debug(
+                "MemoryService: execution summary stored",
+                goal_id=goal.id,
+                status=execution_result.status,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning(
+                "MemoryService: failed to store execution summary",
+                goal_id=goal.id,
+                error=str(exc),
+            )
+
+        # Persist reflection report if present
+        if execution_result.report and execution_result.report.reflection_report:
+            try:
+
+                rr = execution_result.report.reflection_report
+                reflection_content = rr.model_dump_json(indent=2)
+                score = rr.scores.overall_score if rr.scores else None
+                svc.store_reflection(
+                    goal_id=goal.id,
+                    content=reflection_content,
+                    score=score,
+                    attributes={
+                        "reflection_version": rr.reflection_version,
+                        "observation_count": len(rr.observations),
+                        "recommendation_count": len(rr.recommendations),
+                    },
+                )
+                logger.debug(
+                    "MemoryService: reflection report stored",
+                    goal_id=goal.id,
+                    score=score,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "MemoryService: failed to store reflection report",
+                    goal_id=goal.id,
+                    error=str(exc),
+                )
 
     async def _apply_decision(
         self,
