@@ -14,7 +14,6 @@ from core.context.ranker import ContextRanker
 from core.context.resolver import ContextResolver
 from core.logging.logger import logger
 from core.models.context import (
-    ContextAssemblyPolicy,
     ContextBundle,
     ContextMetrics,
     ContextRequest,
@@ -24,7 +23,7 @@ from core.models.context import (
 class ContextEngine:
     """
     Intelligent Context Engine (Phase 8).
-    
+
     Generates structured, execution-aware knowledge for planners, supervisors,
     and agents. Consumes MemoryService but never mutates it.
     """
@@ -42,7 +41,7 @@ class ContextEngine:
     def build_context(self, request: ContextRequest) -> ContextBundle:
         """
         Orchestrate context generation based on the request.
-        
+
         1. Resolve: Fetch and transform records via strategies.
         2. Rank: Deduplicate and score ContextItems.
         3. Assemble: Enforce policies and build immutable ContextBundle.

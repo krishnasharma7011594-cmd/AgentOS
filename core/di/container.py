@@ -19,11 +19,6 @@ from core.ai.providers.base import BaseLLMProvider
 from core.ai.providers.factory import build_llm_provider
 from core.config.settings import Settings
 from core.config.settings import settings as _global_settings
-from core.logging.logger import logger
-from core.memory.providers.vector import VectorMemoryProvider
-from core.memory.repository import DefaultKnowledgeRepository
-from core.memory.service import MemoryService
-from core.models.context import ContextAssemblyPolicy
 from core.context.assembler import ContextAssembler
 from core.context.engine import ContextEngine
 from core.context.ranker import ContextRanker
@@ -34,6 +29,11 @@ from core.context.strategies.implementations import (
     ReflectionContextStrategy,
     SemanticContextStrategy,
 )
+from core.logging.logger import logger
+from core.memory.providers.vector import VectorMemoryProvider
+from core.memory.repository import DefaultKnowledgeRepository
+from core.memory.service import MemoryService
+from core.models.context import ContextAssemblyPolicy
 from core.tools.implementations.web_search import WebSearchTool
 from core.tools.registry import ToolRegistry
 from registry.agent_registry import AgentRegistry

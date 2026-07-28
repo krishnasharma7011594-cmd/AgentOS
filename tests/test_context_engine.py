@@ -9,7 +9,6 @@ from core.context.engine import ContextEngine
 from core.context.ranker import ContextRanker
 from core.context.resolver import ContextResolver
 from core.models.context import (
-    ContextAssemblyPolicy,
     ContextBundle,
     ContextItem,
     ContextMetrics,
@@ -34,14 +33,14 @@ def test_engine_orchestration():
         retrieval_strategy="mock",
         retrieval_timestamp=1.0,
     )
-    
+
     mock_resolver.resolve.return_value = [item]
     mock_ranker.rank.return_value = [item]
-    
+
     expected_bundle = ContextBundle(
         items=[item],
         scope=ContextScope.PLANNER,
-        metrics=ContextMetrics(items_retrieved=1, items_discarded=0, generation_latency_ms=10.0)
+        metrics=ContextMetrics(items_retrieved=1, items_discarded=0, generation_latency_ms=10.0),
     )
     mock_assembler.assemble.return_value = expected_bundle
 

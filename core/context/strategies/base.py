@@ -14,7 +14,7 @@ from core.models.memory import MemoryQuery, MemoryResult
 class ContextStrategy(ABC):
     """
     Abstract interface for Context Strategies.
-    
+
     Strategies are completely decoupled from storage (MemoryService).
     They follow a two-step lifecycle orchestrated by the ContextResolver:
     1. build_queries: Strategy examines the ContextRequest and produces MemoryQueries.
@@ -37,9 +37,7 @@ class ContextStrategy(ABC):
         pass
 
     @abstractmethod
-    def transform(
-        self, request: ContextRequest, results: List[MemoryResult]
-    ) -> List[ContextItem]:
+    def transform(self, request: ContextRequest, results: List[MemoryResult]) -> List[ContextItem]:
         """
         Transform raw memory retrieval results into structured ContextItems.
         The strategy is responsible for setting the priority, source, and reason.

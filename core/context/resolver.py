@@ -7,7 +7,6 @@ from MemoryService and passes them back to strategies for transformation.
 Architecture Layer: Core / Context
 """
 
-import time
 from typing import List, Sequence
 
 from core.context.strategies.base import ContextStrategy
@@ -34,7 +33,8 @@ class ContextResolver:
         Execute all registered strategies.
         For each strategy:
         1. Ask for MemoryQueries.
-        2. Execute the queries against MemoryService (hybrid search if text provided, else metadata).
+        2. Execute the queries against MemoryService
+           (hybrid search if text provided, else metadata).
         3. Pass MemoryResults back to strategy to transform into ContextItems.
         """
         all_items: List[ContextItem] = []
@@ -49,9 +49,10 @@ class ContextResolver:
             for query in queries:
                 # Apply ContextSelectionPolicy filtering
                 if request.selection_policy:
-                    # NOTE: Further implementation can filter MemoryQuery here based on allowed sources/collections
-                    # For now, we enforce collection filters if present
-                    # (This is simplified; a full implementation would map policies strictly to queries)
+                    # NOTE: Further implementation can filter MemoryQuery here
+                    # based on allowed sources/collections.
+                    # For now, collection filters are deferred to query attributes.
+                    # (A full implementation would map policies strictly to queries.)
                     pass
 
                 # If it's a semantic query
@@ -73,7 +74,8 @@ class ContextResolver:
                     results = self._memory.retrieve_by_metadata(query)
                     strategy_results.extend(results)
 
-            # Deduplicate intermediate MemoryResults by ID to avoid redundant items from the same strategy
+            # Deduplicate intermediate MemoryResults by ID
+            # to avoid redundant items from the same strategy.
             unique_results = []
             seen = set()
             for r in strategy_results:

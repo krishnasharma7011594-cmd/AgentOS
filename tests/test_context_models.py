@@ -6,7 +6,6 @@ import pytest
 from pydantic import ValidationError
 
 from core.models.context import (
-    ContextAssemblyPolicy,
     ContextBundle,
     ContextItem,
     ContextMetrics,
@@ -58,7 +57,7 @@ def test_context_bundle_is_empty():
         scope=ContextScope.PLANNER,
     )
     assert bundle.is_empty
-    
+
     item = ContextItem(
         content="test",
         source=ContextSource.KNOWLEDGE,

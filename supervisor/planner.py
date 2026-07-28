@@ -17,7 +17,7 @@ from typing import List, Tuple
 from core.exceptions.base import PlanningError
 from core.logging.logger import logger
 from core.models.context import PlannerInput
-from core.models.domain import ExecutionPlan, Goal, ReplanRequest, Task
+from core.models.domain import ExecutionPlan, ReplanRequest, Task
 from core.utils.helpers import generate_uuid
 
 # Deterministic keyword patterns mapped to capability keys
@@ -86,7 +86,7 @@ class SupervisorPlanner:
 
         # In LLM-driven planning (Phase 3+), we would serialize the ContextBundle here
         # into a prompt string and pass it to the LLM layer.
-        
+
         capabilities = _infer_capabilities(input_data.goal_description)
         tasks = []
         previous_task_id = None

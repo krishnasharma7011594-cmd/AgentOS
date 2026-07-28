@@ -27,11 +27,11 @@ Architecture Layer: Supervisor / Orchestrator
 from core.context.engine import ContextEngine
 from core.exceptions.base import AgentOSError, PlanningError
 from core.execution.events import EventEmitter
-from core.models.context import PlannerInput
 from core.execution.graph import ExecutionGraph
 from core.execution.metrics import MetricsCollector
 from core.logging.logger import logger
 from core.memory.service import MemoryService
+from core.models.context import PlannerInput
 from core.models.domain import (
     Decision,
     DecisionContext,
@@ -132,6 +132,7 @@ class SupervisorOrchestrator:
         planner_context = None
         if self._context_engine:
             from core.models.context import ContextRequest, ContextScope
+
             planner_context = self._context_engine.build_context(
                 ContextRequest(
                     goal_id=goal.id,
@@ -185,6 +186,7 @@ class SupervisorOrchestrator:
         agent_context = None
         if self._context_engine:
             from core.models.context import ContextRequest, ContextScope
+
             agent_context = self._context_engine.build_context(
                 ContextRequest(
                     goal_id=goal.id,
@@ -528,6 +530,7 @@ class SupervisorOrchestrator:
             replan_context = None
             if self._context_engine:
                 from core.models.context import ContextRequest, ContextScope
+
                 replan_context = self._context_engine.build_context(
                     ContextRequest(
                         goal_id=goal.id,

@@ -38,9 +38,7 @@ class SemanticContextStrategy(ContextStrategy):
             )
         ]
 
-    def transform(
-        self, request: ContextRequest, results: List[MemoryResult]
-    ) -> List[ContextItem]:
+    def transform(self, request: ContextRequest, results: List[MemoryResult]) -> List[ContextItem]:
         items = []
         now = time.time()
         for res in results:
@@ -48,7 +46,7 @@ class SemanticContextStrategy(ContextStrategy):
             source = ContextSource.MEMORY
             if res.record.record_type == MemoryRecordType.KNOWLEDGE:
                 source = ContextSource.KNOWLEDGE
-            
+
             items.append(
                 ContextItem(
                     content=res.record.content,
@@ -99,9 +97,7 @@ class ReflectionContextStrategy(ContextStrategy):
         )
         return queries
 
-    def transform(
-        self, request: ContextRequest, results: List[MemoryResult]
-    ) -> List[ContextItem]:
+    def transform(self, request: ContextRequest, results: List[MemoryResult]) -> List[ContextItem]:
         items = []
         now = time.time()
         for res in results:
@@ -144,9 +140,7 @@ class ExecutionHistoryStrategy(ContextStrategy):
             )
         ]
 
-    def transform(
-        self, request: ContextRequest, results: List[MemoryResult]
-    ) -> List[ContextItem]:
+    def transform(self, request: ContextRequest, results: List[MemoryResult]) -> List[ContextItem]:
         items = []
         now = time.time()
         for res in results:
@@ -196,9 +190,7 @@ class KnowledgeContextStrategy(ContextStrategy):
             )
         return queries
 
-    def transform(
-        self, request: ContextRequest, results: List[MemoryResult]
-    ) -> List[ContextItem]:
+    def transform(self, request: ContextRequest, results: List[MemoryResult]) -> List[ContextItem]:
         items = []
         now = time.time()
         for res in results:
