@@ -48,7 +48,10 @@ class ExecutionReviewer:
                         category=ReflectionCategory.FAILURE_RECOVERY,
                         severity=ReflectionSeverity.INFO,
                         description="Execution succeeded despite encountering task failures.",
-                        evidence=f"Failed tasks: {report.metrics.failed_tasks}, Skipped: {report.metrics.skipped_tasks}",
+                        evidence=(
+                            f"Failed tasks: {report.metrics.failed_tasks}, "
+                            f"Skipped: {report.metrics.skipped_tasks}"
+                        ),
                     )
                 )
         else:

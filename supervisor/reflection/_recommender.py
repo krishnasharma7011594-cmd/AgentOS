@@ -41,7 +41,10 @@ class RecommendationEngine:
                         category=ReflectionCategory.RETRY,
                         evidence=obs.evidence,
                         explanation="Excessive retries increase latency and token costs.",
-                        suggested_improvement="Review agent prompt constraints or tool implementations to reduce intermittent failures.",
+                        suggested_improvement=(
+                            "Review agent prompt constraints or tool implementations "
+                            "to reduce intermittent failures."
+                        ),
                     )
                 )
 
@@ -51,8 +54,14 @@ class RecommendationEngine:
                         observation_id=obs.id,
                         category=ReflectionCategory.CAPABILITY_SELECTION,
                         evidence=obs.evidence,
-                        explanation="The planner hallucinated or incorrectly inferred a required capability.",
-                        suggested_improvement="Update planner keyword mappings or capability definitions in AgentMetadata.",
+                        explanation=(
+                            "The planner hallucinated or incorrectly inferred "
+                            "a required capability."
+                        ),
+                        suggested_improvement=(
+                            "Update planner keyword mappings or capability definitions "
+                            "in AgentMetadata."
+                        ),
                     )
                 )
 
@@ -66,7 +75,10 @@ class RecommendationEngine:
                         category=ReflectionCategory.EXECUTION,
                         evidence=obs.evidence,
                         explanation="The goal could not be fully achieved with the current plan.",
-                        suggested_improvement="Consider breaking the goal down into smaller sub-goals or reviewing task dependencies.",
+                        suggested_improvement=(
+                            "Consider breaking the goal down into smaller sub-goals "
+                            "or reviewing task dependencies."
+                        ),
                     )
                 )
 
