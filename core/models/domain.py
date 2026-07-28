@@ -362,7 +362,7 @@ class ExecutionMetrics(BaseModel):
     agent_execution_times: Dict[str, float] = Field(default_factory=dict)
     total_tool_calls: int = Field(default=0)
     total_reasoning_steps: int = Field(default=0)
-    
+
     # Phase 5 Adaptive metrics
     retry_count: int = Field(default=0)
     inserted_task_count: int = Field(default=0)

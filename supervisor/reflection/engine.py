@@ -57,12 +57,8 @@ class ReflectionEngine:
 
         # 4. Synthesize Analyses
         decision_log = report.metrics.decision_log
-        retries = sum(
-            1 for d in decision_log if d.decision.decision_type == DecisionType.RETRY
-        )
-        replans = sum(
-            1 for d in decision_log if d.decision.decision_type == DecisionType.REPLAN
-        )
+        retries = sum(1 for d in decision_log if d.decision.decision_type == DecisionType.RETRY)
+        replans = sum(1 for d in decision_log if d.decision.decision_type == DecisionType.REPLAN)
 
         retry_analysis = f"Total retries: {retries}. "
         if retries > 0:

@@ -52,8 +52,7 @@ class ReflectionScorer:
             recovery_score -= int((report.metrics.failed_tasks / total) * 50)
             decision_log = report.metrics.decision_log
             replans = sum(
-                1 for entry in decision_log 
-                if entry.decision.decision_type == DecisionType.REPLAN
+                1 for entry in decision_log if entry.decision.decision_type == DecisionType.REPLAN
             )
             recovery_score += replans * 10  # Reward dynamic recovery attempts
         recovery_score = max(0, min(100, recovery_score))

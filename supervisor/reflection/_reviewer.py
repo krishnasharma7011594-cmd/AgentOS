@@ -67,17 +67,14 @@ class ExecutionReviewer:
         # 2. Evaluate Retry Behavior
         decision_log = report.metrics.decision_log
         retries = [
-            entry for entry in decision_log
-            if entry.decision.decision_type == DecisionType.RETRY
+            entry for entry in decision_log if entry.decision.decision_type == DecisionType.RETRY
         ]
         if retries:
             observations.append(
                 ReflectionObservation(
                     category=ReflectionCategory.RETRY,
                     severity=(
-                        ReflectionSeverity.LOW
-                        if len(retries) <= 3
-                        else ReflectionSeverity.MEDIUM
+                        ReflectionSeverity.LOW if len(retries) <= 3 else ReflectionSeverity.MEDIUM
                     ),
                     description="Tasks were retried during execution.",
                     evidence=f"Retry count: {len(retries)}",
@@ -85,6 +82,7 @@ class ExecutionReviewer:
             )
             # Check for excessive retries on a single task
             from typing import Dict
+
             task_retry_counts: Dict[str, int] = {}
             for r in retries:
                 task_retry_counts[r.task_id] = task_retry_counts.get(r.task_id, 0) + 1
@@ -102,8 +100,7 @@ class ExecutionReviewer:
 
         # 3. Evaluate Replanning Effectiveness
         replans = [
-            entry for entry in decision_log
-            if entry.decision.decision_type == DecisionType.REPLAN
+            entry for entry in decision_log if entry.decision.decision_type == DecisionType.REPLAN
         ]
         if replans:
             observations.append(
