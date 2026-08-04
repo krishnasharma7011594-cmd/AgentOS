@@ -114,9 +114,9 @@ class ParallelExecutionEngine:
         batch.status = BatchStatus.FAILED if batch_result.has_failures else BatchStatus.COMPLETED
         batch.result = batch_result
 
-        from datetime import datetime
+        from datetime import datetime, timezone
 
-        batch.completed_at = datetime.utcnow()
+        batch.completed_at = datetime.now(timezone.utc)
 
         event_type = (
             EventType.BATCH_FAILED if batch_result.has_failures else EventType.BATCH_COMPLETED

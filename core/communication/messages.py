@@ -1,6 +1,6 @@
 """Inter-agent communication message contracts."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 from pydantic import BaseModel, Field
@@ -14,4 +14,4 @@ class AgentCommunicationEnvelope(BaseModel):
     recipient_id: str = Field(..., description="ID/Name of target agent or supervisor")
     event_type: str = Field(..., description="Type of event or interaction payload")
     payload: Dict[str, Any] = Field(default_factory=dict, description="Structured content payload")
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

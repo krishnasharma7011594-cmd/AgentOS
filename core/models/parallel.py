@@ -7,7 +7,7 @@ All models are strictly serializable.
 Architecture Layer: Core / Models
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import List, Optional
 
@@ -67,7 +67,7 @@ class WorkerException(BaseModel):
     error_type: str
     message: str
     traceback_str: Optional[str] = None
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class BatchResult(BaseModel):
@@ -117,6 +117,6 @@ class ExecutionBatch(BaseModel):
     id: str = Field(default_factory=generate_uuid)
     plan: BatchExecutionPlan
     status: BatchStatus = Field(default=BatchStatus.PENDING)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     completed_at: Optional[datetime] = None
     result: Optional[BatchResult] = None

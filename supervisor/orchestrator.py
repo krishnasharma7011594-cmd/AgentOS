@@ -25,7 +25,7 @@ Architecture Layer: Supervisor / Orchestrator
 """
 
 from core.context.engine import ContextEngine
-from core.exceptions.base import AgentOSError, PlanningError
+from core.exceptions.base import PlanningError
 from core.execution.events import EventEmitter
 from core.execution.graph import ExecutionGraph
 from core.execution.metrics import MetricsCollector
@@ -33,37 +33,27 @@ from core.logging.logger import logger
 from core.memory.service import MemoryService
 from core.models.context import PlannerInput
 from core.models.domain import (
-    Decision,
-    DecisionContext,
-    DecisionLogEntry,
-    DecisionType,
     EventType,
     ExecutionContext,
     ExecutionResult,
-    FailureCategory,
     Goal,
-    GraphMutation,
-    ReplanRequest,
-    Task,
-    TaskEvaluation,
     TaskResult,
-    TaskStatus,
 )
 from core.parallel.analyzer import ExecutionDependencyResolver
 from core.parallel.engine import ParallelExecutionEngine
 from registry.agent_registry import AgentRegistry
 from registry.capability_registry import CapabilityRegistry
 from supervisor.decision_engine import DecisionEngine
+from supervisor.decision_handler import SupervisorDecisionHandler
 from supervisor.evaluator import TaskEvaluator
+from supervisor.memory_bridge import SupervisorMemoryBridge
 from supervisor.planner import SupervisorPlanner
 from supervisor.policies import RetryPolicy
 from supervisor.reflection.engine import ReflectionEngine
 from supervisor.report_generator import SupervisorReportGenerator
 from supervisor.router import SupervisorRouter
+from supervisor.runner import SupervisorTaskRunner
 from supervisor.validator import SupervisorValidator
-
-# Maximum retry budget as a hard safety cap (independent of per-category policy)
-_GLOBAL_MAX_RETRIES = 10
 
 
 class SupervisorOrchestrator:
@@ -75,13 +65,11 @@ class SupervisorOrchestrator:
         2. Invoke SupervisorPlanner to generate ExecutionPlan.
         3. Validate the plan via SupervisorValidator.validate_plan().
         4. Build ExecutionGraph from the validated plan.
-        5. Iterate through READY tasks, executing via SupervisorRouter.
-        6. Evaluate each TaskResult via TaskEvaluator.
-        7. Make structured Decision via DecisionEngine.
-        8. Apply the decision (CONTINUE/RETRY/SKIP/REPLAN/TERMINATE).
-        9. Collect metrics and decision log throughout execution.
-       10. Validate outcomes via SupervisorValidator.validate_result().
-       11. Synthesize final response via SupervisorReportGenerator.
+        5. Iterate through READY tasks, executing via SupervisorTaskRunner.
+        6. Validate individual task results.
+        7. Synthesize final report via SupervisorReportGenerator.
+        8. Reflect on execution.
+        9. Persist to Memory subsystem.
 
     Does NOT import concrete agent modules directly — discovers agents via CapabilityRegistry.
     Dependencies are injected via constructor.
@@ -107,13 +95,32 @@ class SupervisorOrchestrator:
         self.router = router
         self.validator = validator
         self.report_generator = report_generator
-        self._memory_service = memory_service
+
+        # Core engines
         self._context_engine = context_engine
-        self._evaluator = TaskEvaluator()
-        self._decision_engine = DecisionEngine(retry_policy=retry_policy or RetryPolicy())
         self._reflection_engine = ReflectionEngine()
-        self._parallel_engine = parallel_engine
-        self._dependency_resolver = dependency_resolver
+
+        # Memory Bridge
+        self._memory_bridge = None
+        if memory_service:
+            self._memory_bridge = SupervisorMemoryBridge(memory_service)
+
+        # Decision Handling
+        self._decision_handler = SupervisorDecisionHandler(
+            planner=planner,
+            context_engine=context_engine,
+        )
+
+        # Task Runner
+        self._runner = SupervisorTaskRunner(
+            router=router,
+            evaluator=TaskEvaluator(),
+            decision_engine=DecisionEngine(retry_policy=retry_policy or RetryPolicy()),
+            decision_handler=self._decision_handler,
+            parallel_engine=parallel_engine,
+            dependency_resolver=dependency_resolver,
+        )
+
         logger.info(
             "SupervisorOrchestrator: initialized"
             " (Phase 5+6+7+9 — Adaptive+Reflective+Memory+Parallel)"
@@ -209,8 +216,8 @@ class SupervisorOrchestrator:
         attempt_counts: dict[str, int] = {}
 
         # ── Step 4: Adaptive execution loop ──────────────────────────────
-        if self._parallel_engine and self._dependency_resolver:
-            await self._run_parallel_loop(
+        if self._runner._parallel_engine and self._runner._dependency_resolver:
+            await self._runner.run_parallel_loop(
                 goal=goal,
                 graph=graph,
                 context=context,
@@ -220,7 +227,7 @@ class SupervisorOrchestrator:
                 attempt_counts=attempt_counts,
             )
         else:
-            await self._run_sequential_loop(
+            await self._runner.run_sequential_loop(
                 goal=goal,
                 graph=graph,
                 context=context,
@@ -258,8 +265,8 @@ class SupervisorOrchestrator:
             execution_result.report.reflection_report = reflection_report
 
         # ── Step 9: Persist to Memory subsystem (Phase 7) ─────────────────
-        if self._memory_service:
-            self._persist_to_memory(goal, execution_result, metrics)
+        if self._memory_bridge:
+            self._memory_bridge.persist_to_memory(goal, execution_result, metrics)
 
         logger.info(
             "SupervisorOrchestrator: execution complete",
@@ -276,509 +283,6 @@ class SupervisorOrchestrator:
             ),
         )
         return execution_result
-
-    async def _run_parallel_loop(
-        self,
-        goal: Goal,
-        graph: ExecutionGraph,
-        context: ExecutionContext,
-        collector: MetricsCollector,
-        emitter: EventEmitter,
-        task_results: list[TaskResult],
-        attempt_counts: dict[str, int],
-    ) -> bool:
-        from core.models.parallel import ExecutionCancellationToken
-
-        assert self._dependency_resolver is not None
-        assert self._parallel_engine is not None
-
-        terminated = False
-
-        while not graph.is_complete() and not terminated:
-            batch_plan = self._dependency_resolver.resolve(graph)
-
-            if batch_plan.is_empty:
-                if self._dependency_resolver.has_deadlock(graph):
-                    logger.error(
-                        "SupervisorOrchestrator: execution deadlock detected.",
-                        goal_id=goal.id,
-                    )
-                else:
-                    logger.warning(
-                        "SupervisorOrchestrator: no ready tasks but graph not complete",
-                        goal_id=goal.id,
-                    )
-                break
-
-            cancel_token = ExecutionCancellationToken()
-
-            for task in batch_plan.tasks:
-                emitter.emit(EventType.TASK_STARTED, task_id=task.id, details=task.name)
-                graph.mark_task_running(task.id)
-                collector.start_task(task.id)
-                logger.info(
-                    "SupervisorOrchestrator: queueing task in batch",
-                    task_id=task.id,
-                    task_name=task.name,
-                    attempt=attempt_counts.get(task.id, 0),
-                )
-
-            batch_result = await self._parallel_engine.execute_batch(
-                plan=batch_plan,
-                context=context,
-                cancellation_token=cancel_token,
-                event_emitter=emitter,
-            )
-
-            all_results = batch_result.successful_results + batch_result.failed_results
-
-            for result in all_results:
-                task = graph._tasks[result.task_id]
-                collector.end_task(task.id, result.agent_id, result)
-
-                evaluation = self._evaluator.evaluate(task, result)
-                attempt = attempt_counts.get(task.id, 0)
-
-                decision_ctx = DecisionContext(
-                    task_id=task.id,
-                    evaluation=evaluation,
-                    attempt_count=attempt,
-                    pending_count=len(graph.get_remaining_tasks()),
-                    failed_count=len(graph.get_failed_tasks()),
-                )
-                decision = self._decision_engine.make_decision(decision_ctx)
-
-                log_entry = DecisionLogEntry(
-                    task_id=task.id,
-                    decision=decision,
-                    evaluation=evaluation,
-                    attempt_count=attempt,
-                )
-                collector.record_decision(log_entry)
-
-                logger.info(
-                    "SupervisorOrchestrator: decision",
-                    task_id=task.id,
-                    decision=decision.decision_type.value,
-                    reason=decision.reason,
-                )
-
-                terminated = await self._apply_decision(
-                    decision=decision,
-                    task=task,
-                    result=result,
-                    evaluation=evaluation,
-                    graph=graph,
-                    collector=collector,
-                    emitter=emitter,
-                    context=context,
-                    task_results=task_results,
-                    attempt_counts=attempt_counts,
-                    goal=goal,
-                )
-                if terminated:
-                    break
-
-            # Record any newly-skipped tasks
-            graph.advance()
-            for skipped_task in graph.get_skipped_tasks():
-                if skipped_task.id not in context.results:
-                    skip_result = TaskResult(
-                        task_id=skipped_task.id,
-                        agent_id="supervisor",
-                        status=TaskStatus.SKIPPED,
-                        summary="Skipped: a required dependency failed or was skipped.",
-                    )
-                    context.results[skipped_task.id] = skip_result
-                    task_results.append(skip_result)
-                    collector.start_task(skipped_task.id)
-                    collector.end_task(skipped_task.id, "supervisor", skip_result)
-                    emitter.emit(
-                        EventType.TASK_SKIPPED,
-                        task_id=skipped_task.id,
-                        details="Dependency cascade skip.",
-                    )
-
-        return terminated
-
-    async def _run_sequential_loop(
-        self,
-        goal: Goal,
-        graph: ExecutionGraph,
-        context: ExecutionContext,
-        collector: MetricsCollector,
-        emitter: EventEmitter,
-        task_results: list[TaskResult],
-        attempt_counts: dict[str, int],
-    ) -> bool:
-        terminated = False
-
-        while not graph.is_complete() and not terminated:
-            ready_tasks = graph.get_ready_tasks()
-            if not ready_tasks:
-                running = graph.get_running_tasks()
-                if not running:
-                    logger.error(
-                        "SupervisorOrchestrator: execution deadlock detected.",
-                        goal_id=goal.id,
-                    )
-                else:
-                    logger.warning(
-                        "SupervisorOrchestrator: no ready tasks but graph not complete",
-                        goal_id=goal.id,
-                    )
-                break
-            task = ready_tasks[0]
-
-            emitter.emit(EventType.TASK_STARTED, task_id=task.id, details=task.name)
-            logger.info(
-                "SupervisorOrchestrator: executing task",
-                task_id=task.id,
-                task_name=task.name,
-                capability=task.required_capability,
-                attempt=attempt_counts.get(task.id, 0),
-            )
-            graph.mark_task_running(task.id)
-            collector.start_task(task.id)
-
-            try:
-                result = await self.router.route_task(task, context)
-            except AgentOSError as exc:
-                logger.error(
-                    "SupervisorOrchestrator: task routing failed",
-                    task_id=task.id,
-                    error=str(exc),
-                )
-                result = TaskResult(
-                    task_id=task.id,
-                    agent_id="supervisor",
-                    status=TaskStatus.FAILED,
-                    summary="",
-                    error=str(exc),
-                )
-
-            collector.end_task(task.id, result.agent_id, result)
-
-            evaluation = self._evaluator.evaluate(task, result)
-            attempt = attempt_counts.get(task.id, 0)
-
-            decision_ctx = DecisionContext(
-                task_id=task.id,
-                evaluation=evaluation,
-                attempt_count=attempt,
-                pending_count=len(graph.get_remaining_tasks()),
-                failed_count=len(graph.get_failed_tasks()),
-            )
-            decision = self._decision_engine.make_decision(decision_ctx)
-
-            log_entry = DecisionLogEntry(
-                task_id=task.id,
-                decision=decision,
-                evaluation=evaluation,
-                attempt_count=attempt,
-            )
-            collector.record_decision(log_entry)
-
-            logger.info(
-                "SupervisorOrchestrator: decision",
-                task_id=task.id,
-                decision=decision.decision_type.value,
-                reason=decision.reason,
-            )
-
-            terminated = await self._apply_decision(
-                decision=decision,
-                task=task,
-                result=result,
-                evaluation=evaluation,
-                graph=graph,
-                collector=collector,
-                emitter=emitter,
-                context=context,
-                task_results=task_results,
-                attempt_counts=attempt_counts,
-                goal=goal,
-            )
-            if terminated:
-                break
-
-            graph.advance()
-
-            for skipped_task in graph.get_skipped_tasks():
-                if skipped_task.id not in context.results:
-                    skip_result = TaskResult(
-                        task_id=skipped_task.id,
-                        agent_id="supervisor",
-                        status=TaskStatus.SKIPPED,
-                        summary="Skipped: a required dependency failed or was skipped.",
-                    )
-                    context.results[skipped_task.id] = skip_result
-                    task_results.append(skip_result)
-                    collector.start_task(skipped_task.id)
-                    collector.end_task(skipped_task.id, "supervisor", skip_result)
-                    emitter.emit(
-                        EventType.TASK_SKIPPED,
-                        task_id=skipped_task.id,
-                        details="Dependency cascade skip.",
-                    )
-        return terminated
-
-    def _persist_to_memory(
-        self,
-        goal: Goal,
-        execution_result: ExecutionResult,
-        metrics: object,
-    ) -> None:
-        """
-        Persist execution summary and reflection artifacts to MemoryService.
-
-        Called after execution + reflection complete. Never raises — any
-        storage failure is logged and suppressed to preserve execution purity.
-        """
-        assert self._memory_service is not None  # guarded by caller
-        svc = self._memory_service
-
-        try:
-            # Persist execution summary
-            exec_summary = (
-                execution_result.response
-                if isinstance(execution_result.response, str)
-                else str(execution_result.response)
-            )
-            exec_attrs = {
-                "execution_time_ms": getattr(metrics, "execution_time_ms", None),
-                "total_tasks": getattr(metrics, "total_tasks", None),
-                "failed_tasks": getattr(metrics, "failed_tasks", None),
-            }
-            svc.store_execution(
-                goal_id=goal.id,
-                summary=exec_summary,
-                status=execution_result.status,
-                attributes={k: v for k, v in exec_attrs.items() if v is not None},
-            )
-            logger.debug(
-                "MemoryService: execution summary stored",
-                goal_id=goal.id,
-                status=execution_result.status,
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.warning(
-                "MemoryService: failed to store execution summary",
-                goal_id=goal.id,
-                error=str(exc),
-            )
-
-        # Persist reflection report if present
-        if execution_result.report and execution_result.report.reflection_report:
-            try:
-
-                rr = execution_result.report.reflection_report
-                reflection_content = rr.model_dump_json(indent=2)
-                score = rr.scores.overall_score if rr.scores else None
-                svc.store_reflection(
-                    goal_id=goal.id,
-                    content=reflection_content,
-                    score=score,
-                    attributes={
-                        "reflection_version": rr.reflection_version,
-                        "observation_count": len(rr.observations),
-                        "recommendation_count": len(rr.recommendations),
-                    },
-                )
-                logger.debug(
-                    "MemoryService: reflection report stored",
-                    goal_id=goal.id,
-                    score=score,
-                )
-            except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "MemoryService: failed to store reflection report",
-                    goal_id=goal.id,
-                    error=str(exc),
-                )
-
-    async def _apply_decision(
-        self,
-        decision: Decision,
-        task: Task,
-        result: TaskResult,
-        evaluation: TaskEvaluation,
-        graph: ExecutionGraph,
-        collector: MetricsCollector,
-        emitter: EventEmitter,
-        context: ExecutionContext,
-        task_results: list[TaskResult],
-        attempt_counts: dict[str, int],
-        goal: Goal,
-    ) -> bool:
-        """
-        Apply a supervisor Decision and return True when execution should terminate.
-
-        Args:
-            decision:       The Decision from DecisionEngine.
-            task:           The task just executed.
-            result:         The raw TaskResult.
-            evaluation:     Structured evaluation used to produce the decision.
-            graph:          Live ExecutionGraph to mutate if needed.
-            collector:      MetricsCollector for telemetry.
-            emitter:        EventEmitter for lifecycle events.
-            context:        ExecutionContext for cross-task sharing.
-            task_results:   Accumulated list of TaskResult records.
-            attempt_counts: Per-task retry counter dict.
-            goal:           The parent Goal for replanning context.
-
-        Returns:
-            True if execution should be terminated, False otherwise.
-        """
-        dt = decision.decision_type
-
-        # ── CONTINUE ─────────────────────────────────────────────────────
-        if dt == DecisionType.CONTINUE:
-            graph.mark_task_success(task.id, result)
-            context.results[task.id] = result
-            task_results.append(result)
-            emitter.emit(
-                EventType.TASK_COMPLETED,
-                task_id=task.id,
-                details="Success.",
-            )
-            return False
-
-        # ── RETRY ─────────────────────────────────────────────────────────
-        if dt == DecisionType.RETRY:
-            attempt_counts[task.id] = attempt_counts.get(task.id, 0) + 1
-            category = evaluation.failure_category or FailureCategory.UNKNOWN
-            collector.record_retry(task.id, category)
-            # Safety cap
-            if attempt_counts[task.id] >= _GLOBAL_MAX_RETRIES:
-                logger.warning(
-                    "SupervisorOrchestrator: global retry cap hit, forcing SKIP",
-                    task_id=task.id,
-                )
-                graph.mark_task_failed(task.id, result)
-                context.results[task.id] = result
-                task_results.append(result)
-                emitter.emit(
-                    EventType.TASK_FAILED,
-                    task_id=task.id,
-                    details="Global retry cap reached.",
-                )
-                return False
-            # Put the task back in READY for the next loop iteration
-            graph.mark_task_failed(task.id, result)
-            graph.mark_task_ready(task.id)
-            emitter.emit(
-                EventType.TASK_RETRIED,
-                task_id=task.id,
-                details=f"Attempt {attempt_counts[task.id]}. Reason: {decision.reason}",
-            )
-            return False
-
-        # ── SKIP ──────────────────────────────────────────────────────────
-        if dt == DecisionType.SKIP:
-            graph.mark_task_failed(task.id, result)
-            context.results[task.id] = result
-            task_results.append(result)
-            emitter.emit(
-                EventType.TASK_FAILED,
-                task_id=task.id,
-                details=f"Skipped by supervisor. Reason: {decision.reason}",
-            )
-            return False
-
-        # ── REPLAN ────────────────────────────────────────────────────────
-        if dt == DecisionType.REPLAN:
-            context_summary = "; ".join(
-                f"{tid}: {r.status.value}" for tid, r in context.results.items()
-            )
-            replan_context = None
-            if self._context_engine:
-                from core.models.context import ContextRequest, ContextScope
-
-                replan_context = self._context_engine.build_context(
-                    ContextRequest(
-                        goal_id=goal.id,
-                        goal_description=goal.description,
-                        task_id=task.id,
-                        task_description=task.description,
-                        scope=ContextScope.SUPERVISOR,
-                    )
-                )
-
-            replan_request = ReplanRequest(
-                goal_id=goal.id,
-                failed_task_id=task.id,
-                evaluation=evaluation,
-                context_summary=context_summary,
-                context_bundle=replan_context,
-            )
-            logger.info(
-                "SupervisorOrchestrator: replanning",
-                failed_task_id=replan_request.failed_task_id,
-            )
-            try:
-                new_tasks = await self.planner.create_recovery_tasks(replan_request)
-            except Exception as exc:
-                logger.warning(
-                    "SupervisorOrchestrator: replanning failed, falling back to SKIP",
-                    task_id=task.id,
-                    error=str(exc),
-                )
-                graph.mark_task_failed(task.id, result)
-                context.results[task.id] = result
-                task_results.append(result)
-                emitter.emit(
-                    EventType.TASK_FAILED,
-                    task_id=task.id,
-                    details="Replan failed, task skipped.",
-                )
-                return False
-
-            if new_tasks:
-                mutation = GraphMutation(
-                    new_tasks=new_tasks,
-                    before_task_ids=[],  # new tasks run independently; original task is skipped
-                )
-                try:
-                    graph.apply_mutation(mutation)
-                    for new_task in new_tasks:
-                        collector.record_inserted_task(new_task.id)
-                        emitter.emit(
-                            EventType.TASK_INSERTED,
-                            task_id=new_task.id,
-                            details=f"Inserted via replan for failed task {task.id}.",
-                        )
-                except ValueError as exc:
-                    logger.warning(
-                        "SupervisorOrchestrator: graph mutation rejected",
-                        error=str(exc),
-                    )
-
-            # Mark the original failed task as failed (it triggered the replan)
-            graph.mark_task_failed(task.id, result)
-            context.results[task.id] = result
-            task_results.append(result)
-            return False
-
-        # ── TERMINATE ─────────────────────────────────────────────────────
-        if dt == DecisionType.TERMINATE:
-            logger.warning(
-                "SupervisorOrchestrator: terminating execution",
-                task_id=task.id,
-                reason=decision.reason,
-            )
-            graph.mark_task_failed(task.id, result)
-            context.results[task.id] = result
-            task_results.append(result)
-            emitter.emit(
-                EventType.TASK_FAILED,
-                task_id=task.id,
-                details=f"Execution terminated. Reason: {decision.reason}",
-            )
-            return True  # signal the outer loop to stop
-
-        # Unreachable — all DecisionType values handled above
-        return False
 
     @staticmethod
     def _error_result(goal: Goal, message: str) -> ExecutionResult:

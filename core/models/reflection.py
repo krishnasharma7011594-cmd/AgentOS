@@ -10,7 +10,7 @@ They do not influence active workflow execution.
 Architecture Layer: Core / Models
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import List
 
@@ -151,4 +151,4 @@ class ReflectionReport(BaseModel):
     retry_analysis: str = Field(default="")
     replanning_analysis: str = Field(default="")
 
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

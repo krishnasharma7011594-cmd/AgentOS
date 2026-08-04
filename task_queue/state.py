@@ -1,6 +1,6 @@
 """Task queue item state representation."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -14,7 +14,7 @@ class QueueItemState(BaseModel):
     task_id: str = Field(..., description="Unique task identifier")
     state: WorkflowState = Field(default=WorkflowState.QUEUED)
     retries: int = Field(default=0)
-    enqueued_at: datetime = Field(default_factory=datetime.utcnow)
+    enqueued_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     started_at: Optional[datetime] = None
     finished_at: Optional[datetime] = None
     error: Optional[str] = None

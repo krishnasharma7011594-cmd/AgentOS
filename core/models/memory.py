@@ -7,7 +7,7 @@ Architecture Layer: Core / Models
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -63,7 +63,7 @@ class MemoryRecord(BaseModel):
     record_type: MemoryRecordType
     content: str
     metadata: MemoryMetadata = Field(default_factory=MemoryMetadata)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     # The vectorized representation (if applicable)
     embedding: Optional[List[float]] = None

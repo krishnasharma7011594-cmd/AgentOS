@@ -62,7 +62,7 @@ class ResourceLease(BaseModel):
 
     lease_id: str
     resource_name: str
-    granted_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
+    granted_at: datetime.datetime = Field(default_factory=lambda: datetime.datetime.now(datetime.timezone.utc))
     expires_at: Optional[datetime.datetime] = None
     owner_id: str
 

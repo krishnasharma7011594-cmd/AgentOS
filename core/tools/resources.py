@@ -43,7 +43,7 @@ class ResourceManager:
                 f"Resource '{resource_name}' is currently leased by {current_lease.owner_id}."
             )
 
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.timezone.utc)
         expires_at = now + datetime.timedelta(seconds=duration_sec) if duration_sec else None
 
         lease = ResourceLease(
@@ -74,7 +74,7 @@ class ResourceManager:
 
     def _cleanup_expired(self) -> None:
         """Remove leases that have expired."""
-        now = datetime.datetime.utcnow()
+        now = datetime.datetime.now(datetime.timezone.utc)
         expired = []
         for res_name, lease in self._active_leases.items():
             if lease.expires_at and lease.expires_at < now:

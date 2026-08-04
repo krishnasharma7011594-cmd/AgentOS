@@ -25,7 +25,7 @@ Phase 5 adds:
 Architecture Layer: Core / Models
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -192,7 +192,7 @@ class Message(BaseModel):
     role: RoleEnum = Field(..., description="Role of the sender")
     content: str = Field(..., description="Textual content of the message")
     metadata: Dict[str, Any] = Field(default_factory=dict)
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class Goal(BaseModel):
@@ -209,7 +209,7 @@ class Goal(BaseModel):
     id: str = Field(default_factory=generate_uuid)
     description: str = Field(..., description="Clear text description of the goal")
     constraints: List[str] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class Task(BaseModel):
@@ -241,7 +241,7 @@ class Task(BaseModel):
         default_factory=list,
         description="List of task IDs this task depends on",
     )
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ExecutionPlan(BaseModel):
@@ -258,7 +258,7 @@ class ExecutionPlan(BaseModel):
     id: str = Field(default_factory=generate_uuid)
     goal_id: str = Field(..., description="Target Goal ID")
     tasks: List[Task] = Field(default_factory=list)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class TaskResult(BaseModel):
@@ -281,7 +281,7 @@ class TaskResult(BaseModel):
     summary: str = Field(..., description="Human-readable summary of the result")
     metadata: Dict[str, Any] = Field(default_factory=dict)
     error: Optional[str] = Field(default=None, description="Error message if failed")
-    completed_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class ExecutionContext(BaseModel):
@@ -322,7 +322,7 @@ class ValidationResult(BaseModel):
     task_id: str
     is_valid: bool
     reason: str
-    validated_at: datetime = Field(default_factory=datetime.utcnow)
+    validated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class PlanValidationResult(BaseModel):
@@ -415,7 +415,7 @@ class ExecutionReport(BaseModel):
         description="Structured analysis of the completed execution (Phase 6)",
     )
     final_response: str = Field(..., description="Synthesized final answer text")
-    generated_at: datetime = Field(default_factory=datetime.utcnow)
+    generated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ---------------------------------------------------------------------------
@@ -446,7 +446,7 @@ class ExecutionResult(BaseModel):
         default=None,
         description="Rich structured execution report (Phase 4.5+)",
     )
-    completed_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ---------------------------------------------------------------------------
@@ -642,7 +642,7 @@ class ExecutionEvent(BaseModel):
     event_type: EventType = Field(..., description="Type of lifecycle event")
     task_id: Optional[str] = Field(default=None, description="Associated task ID")
     details: str = Field(default="", description="Optional detail string")
-    occurred_at: datetime = Field(default_factory=datetime.utcnow)
+    occurred_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class DecisionLogEntry(BaseModel):
@@ -661,7 +661,7 @@ class DecisionLogEntry(BaseModel):
     decision: Decision
     evaluation: TaskEvaluation
     attempt_count: int = Field(default=0)
-    logged_at: datetime = Field(default_factory=datetime.utcnow)
+    logged_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 # ---------------------------------------------------------------------------

@@ -37,6 +37,7 @@ class DatabaseSettings(BaseSettings):
     Encapsulates connection configuration for PostgreSQL / vector stores.
     """
 
+    # Reserved for Phase 8 / vector store integration — not yet wired up.
     db_host: str = Field(default="localhost", alias="DB_HOST")
     db_port: int = Field(default=5432, alias="DB_PORT")
     db_name: str = Field(default="agentos_db", alias="DB_NAME")

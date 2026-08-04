@@ -1,7 +1,7 @@
 """Common system utilities and helpers."""
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 def generate_uuid() -> str:
@@ -11,4 +11,4 @@ def generate_uuid() -> str:
 
 def current_utc_timestamp() -> datetime:
     """Get current UTC datetime."""
-    return datetime.utcnow()
+    return datetime.now(timezone.utc)

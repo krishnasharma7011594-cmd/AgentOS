@@ -156,8 +156,8 @@ class TestDIWiring:
 
             orchestrator = build_orchestrator()
 
-        assert orchestrator._memory_service is not None
-        assert isinstance(orchestrator._memory_service, MemoryService)
+        assert orchestrator._memory_bridge is not None
+        assert isinstance(orchestrator._memory_bridge._memory_service, MemoryService)
 
 
 # =========================================================================
@@ -178,18 +178,9 @@ class TestOrchestratorMemoryPersistence:
             embedding_provider=DeterministicEmbeddingProvider(),
         )
 
-        from supervisor.orchestrator import SupervisorOrchestrator
+        from supervisor.memory_bridge import SupervisorMemoryBridge
 
-        # Build a minimal orchestrator with memory service
-        orchestrator = SupervisorOrchestrator(
-            agent_registry=MagicMock(),
-            capability_registry=MagicMock(),
-            planner=MagicMock(),
-            router=MagicMock(),
-            validator=MagicMock(),
-            report_generator=MagicMock(),
-            memory_service=svc,
-        )
+        bridge = SupervisorMemoryBridge(memory_service=svc)
 
         from core.models.domain import ExecutionResult, Goal
 
@@ -205,7 +196,7 @@ class TestOrchestratorMemoryPersistence:
         fake_metrics.total_tasks = 2
         fake_metrics.failed_tasks = 0
 
-        orchestrator._persist_to_memory(goal, exec_result, fake_metrics)
+        bridge.persist_to_memory(goal, exec_result, fake_metrics)
 
         # Verify at least one execution record was stored
         executions = repo.list_collection(COLLECTION_EXECUTIONS)
@@ -225,17 +216,9 @@ class TestOrchestratorMemoryPersistence:
         )
 
         from core.models.domain import ExecutionResult, Goal
-        from supervisor.orchestrator import SupervisorOrchestrator
+        from supervisor.memory_bridge import SupervisorMemoryBridge
 
-        orchestrator = SupervisorOrchestrator(
-            agent_registry=MagicMock(),
-            capability_registry=MagicMock(),
-            planner=MagicMock(),
-            router=MagicMock(),
-            validator=MagicMock(),
-            report_generator=MagicMock(),
-            memory_service=svc,
-        )
+        bridge = SupervisorMemoryBridge(memory_service=svc)
 
         goal = Goal(description="test reflection persistence")
 
@@ -264,7 +247,7 @@ class TestOrchestratorMemoryPersistence:
         fake_metrics = MagicMock()
         fake_metrics.execution_time_ms = 200
 
-        orchestrator._persist_to_memory(goal, exec_result, fake_metrics)
+        bridge.persist_to_memory(goal, exec_result, fake_metrics)
 
         reflections = repo.list_collection(COLLECTION_REFLECTIONS)
         assert len(reflections) == 1
