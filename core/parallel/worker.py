@@ -24,10 +24,7 @@ class TaskExecutor(ABC):
 
     @abstractmethod
     async def execute_task(
-        self, 
-        task: Task, 
-        context: ExecutionContext,
-        cancellation_token: ExecutionCancellationToken
+        self, task: Task, context: ExecutionContext, cancellation_token: ExecutionCancellationToken
     ) -> TaskResult:
         """Execute the task and return its TaskResult."""
         pass
@@ -43,10 +40,7 @@ class Worker:
         self._executor = executor
 
     async def run(
-        self,
-        task: Task,
-        context: ExecutionContext,
-        cancellation_token: ExecutionCancellationToken
+        self, task: Task, context: ExecutionContext, cancellation_token: ExecutionCancellationToken
     ) -> TaskResult:
         """
         Runs the task safely. Any unhandled exception is caught and converted
@@ -80,7 +74,7 @@ class Worker:
                 error=f"{worker_exc.error_type}: {worker_exc.message}",
                 # Storing the full WorkerException inside the TaskResult metadata
                 # so it can be extracted and aggregated by the FailureCollector/Engine.
-                metadata={"worker_exception": worker_exc.model_dump()}
+                metadata={"worker_exception": worker_exc.model_dump()},
             )
 
 
@@ -102,7 +96,7 @@ class WorkerPool:
         Creates a new stateless Worker instance for executing a task.
         """
         return Worker(self._executor)
-    
+
     @property
     def max_workers(self) -> int:
         return self._policy.max_workers

@@ -277,7 +277,6 @@ class SupervisorOrchestrator:
         )
         return execution_result
 
-
     async def _run_parallel_loop(
         self,
         goal: Goal,
@@ -289,11 +288,15 @@ class SupervisorOrchestrator:
         attempt_counts: dict[str, int],
     ) -> bool:
         from core.models.parallel import ExecutionCancellationToken
+
+        assert self._dependency_resolver is not None
+        assert self._parallel_engine is not None
+
         terminated = False
 
         while not graph.is_complete() and not terminated:
             batch_plan = self._dependency_resolver.resolve(graph)
-            
+
             if batch_plan.is_empty:
                 if self._dependency_resolver.has_deadlock(graph):
                     logger.error(
@@ -332,10 +335,10 @@ class SupervisorOrchestrator:
             for result in all_results:
                 task = graph._tasks[result.task_id]
                 collector.end_task(task.id, result.agent_id, result)
-                
+
                 evaluation = self._evaluator.evaluate(task, result)
                 attempt = attempt_counts.get(task.id, 0)
-                
+
                 decision_ctx = DecisionContext(
                     task_id=task.id,
                     evaluation=evaluation,
@@ -519,7 +522,6 @@ class SupervisorOrchestrator:
                         details="Dependency cascade skip.",
                     )
         return terminated
-        
 
     def _persist_to_memory(
         self,

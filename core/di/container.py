@@ -178,7 +178,7 @@ def build_orchestrator(app_settings: Settings | None = None) -> SupervisorOrches
 
     # 7. Parallel subsystem (Phase 9)
     dependency_resolver = ExecutionDependencyResolver()
-    execution_policy = ExecutionPolicy(max_workers=4, default_timeout=300.0)
+    execution_policy = ExecutionPolicy(max_workers=4, timeout_ms=300000)
     task_executor = SupervisorTaskExecutor(router=router)
     worker_pool = WorkerPool(executor=task_executor, policy=execution_policy)
     execution_scheduler = ExecutionScheduler(worker_pool=worker_pool)

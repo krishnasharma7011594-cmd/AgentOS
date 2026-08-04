@@ -20,10 +20,7 @@ class SupervisorTaskExecutor(TaskExecutor):
         self._router = router
 
     async def execute_task(
-        self, 
-        task: Task, 
-        context: ExecutionContext,
-        cancellation_token: ExecutionCancellationToken
+        self, task: Task, context: ExecutionContext, cancellation_token: ExecutionCancellationToken
     ) -> TaskResult:
         """
         Executes a task by routing it.

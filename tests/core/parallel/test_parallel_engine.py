@@ -41,6 +41,7 @@ from core.utils.helpers import generate_uuid
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _task(
     goal_id: str,
     name: str = "task",
@@ -410,10 +411,12 @@ class TestParallelExecutionEngine:
         t1 = _task(goal_id, "success")
         t2 = _task(goal_id, "fail")
 
-        executor = MockTaskExecutor({
-            t1.id: _result(t1.id, TaskStatus.SUCCESS),
-            t2.id: _result(t2.id, TaskStatus.FAILED),
-        })
+        executor = MockTaskExecutor(
+            {
+                t1.id: _result(t1.id, TaskStatus.SUCCESS),
+                t2.id: _result(t2.id, TaskStatus.FAILED),
+            }
+        )
         engine = self._make_engine(executor)
 
         plan = BatchExecutionPlan(tasks=[t1, t2])

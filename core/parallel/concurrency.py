@@ -27,7 +27,7 @@ class ConcurrencyProvider:
         """Non-blocking sleep."""
         await asyncio.sleep(delay)
 
-    def create_task(self, coro: Coroutine[Any, Any, Any]) -> asyncio.Task:
+    def create_task(self, coro: Coroutine[Any, Any, Any]) -> asyncio.Task[Any]:
         """Spawn a background task."""
         return asyncio.create_task(coro)
 
@@ -45,7 +45,7 @@ class ExecutionBarrier:
 
     def __init__(self, concurrency: ConcurrencyProvider):
         self._concurrency = concurrency
-        self._pending_tasks: List[asyncio.Task] = []
+        self._pending_tasks: List[asyncio.Task[Any]] = []
 
     def register_worker_task(self, coro: Coroutine[Any, Any, Any]) -> None:
         """Register a worker's execution coroutine to be waited upon."""

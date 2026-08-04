@@ -30,17 +30,14 @@ class ExecutionScheduler:
         Sorts primarily by priority (high > medium > low) and secondarily by task ID.
         """
         priority_map = {"high": 0, "medium": 1, "low": 2}
-        return sorted(
-            tasks,
-            key=lambda t: (priority_map.get(t.priority.lower(), 1), t.id)
-        )
+        return sorted(tasks, key=lambda t: (priority_map.get(t.priority.lower(), 1), t.id))
 
     def schedule_batch(
         self,
         plan: BatchExecutionPlan,
         barrier: ExecutionBarrier,
         context: ExecutionContext,
-        cancellation_token: ExecutionCancellationToken
+        cancellation_token: ExecutionCancellationToken,
     ) -> None:
         """
         Takes the tasks from the BatchExecutionPlan, sorts them deterministically,
@@ -57,11 +54,12 @@ class ExecutionScheduler:
         # But we want to hide asyncio. Let's create a wrapper that uses
         # an async semaphore without exposing it in the domain models,
         # or we just rely on the backend via ConcurrencyProvider.
-        # Here we just register the coroutines. If max_workers is needed, 
+        # Here we just register the coroutines. If max_workers is needed,
         # we can wrap it. Let's assume the ConcurrencyProvider or the barrier handles it,
         # or we just use asyncio.Semaphore internally here as it's an implementation detail.
-        
+
         import asyncio
+
         semaphore = asyncio.Semaphore(max_workers)
 
         async def worker_wrapper(task: Task) -> TaskResult:

@@ -7,7 +7,6 @@ be executed safely in parallel. Ensures no dependency violations.
 Architecture Layer: Core / Parallel
 """
 
-
 from core.execution.graph import ExecutionGraph
 from core.models.domain import TaskStatus
 from core.models.parallel import BatchExecutionPlan
