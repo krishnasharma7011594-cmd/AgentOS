@@ -612,12 +612,16 @@ class ReplanRequest(BaseModel):
 class EventType(str, Enum):
     """Enumeration of observable execution lifecycle events."""
 
+    TASK_QUEUED = "task_queued"
     TASK_STARTED = "task_started"
     TASK_COMPLETED = "task_completed"
     TASK_FAILED = "task_failed"
     TASK_SKIPPED = "task_skipped"
     TASK_RETRIED = "task_retried"
     TASK_INSERTED = "task_inserted"
+    BATCH_STARTED = "batch_started"
+    BATCH_COMPLETED = "batch_completed"
+    BATCH_FAILED = "batch_failed"
     EXECUTION_FINISHED = "execution_finished"
 
 

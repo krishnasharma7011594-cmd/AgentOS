@@ -34,6 +34,12 @@ from core.memory.providers.vector import VectorMemoryProvider
 from core.memory.repository import DefaultKnowledgeRepository
 from core.memory.service import MemoryService
 from core.models.context import ContextAssemblyPolicy
+from core.models.parallel import ExecutionPolicy
+from core.parallel.analyzer import ExecutionDependencyResolver
+from core.parallel.concurrency import ConcurrencyProvider
+from core.parallel.engine import ParallelExecutionEngine
+from core.parallel.scheduler import ExecutionScheduler
+from core.parallel.worker import WorkerPool
 from core.tools.implementations.web_search import WebSearchTool
 from core.tools.registry import ToolRegistry
 from registry.agent_registry import AgentRegistry
@@ -43,6 +49,7 @@ from supervisor.planner import SupervisorPlanner
 from supervisor.report_generator import SupervisorReportGenerator
 from supervisor.router import SupervisorRouter
 from supervisor.validator import SupervisorValidator
+from supervisor.worker import SupervisorTaskExecutor
 
 
 def _register_agents(
@@ -169,7 +176,20 @@ def build_orchestrator(app_settings: Settings | None = None) -> SupervisorOrches
     )
     logger.info("DI: ContextEngine registered with 4 strategies")
 
-    # 7. Wire up final orchestrator
+    # 7. Parallel subsystem (Phase 9)
+    dependency_resolver = ExecutionDependencyResolver()
+    execution_policy = ExecutionPolicy(max_workers=4, default_timeout=300.0)
+    task_executor = SupervisorTaskExecutor(router=router)
+    worker_pool = WorkerPool(executor=task_executor, policy=execution_policy)
+    execution_scheduler = ExecutionScheduler(worker_pool=worker_pool)
+    concurrency_provider = ConcurrencyProvider()
+    parallel_engine = ParallelExecutionEngine(
+        scheduler=execution_scheduler,
+        concurrency_provider=concurrency_provider,
+    )
+    logger.info("DI: ParallelExecutionEngine registered")
+
+    # 8. Wire up final orchestrator
     orchestrator = SupervisorOrchestrator(
         agent_registry=agent_registry,
         capability_registry=capability_registry,
@@ -179,6 +199,8 @@ def build_orchestrator(app_settings: Settings | None = None) -> SupervisorOrches
         report_generator=report_generator,
         memory_service=memory_service,
         context_engine=context_engine,
+        parallel_engine=parallel_engine,
+        dependency_resolver=dependency_resolver,
     )
 
     logger.info(
