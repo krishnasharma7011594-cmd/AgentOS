@@ -16,6 +16,7 @@ Architecture Layer: Core / Tools / Implementations
 from typing import Any, ClassVar, List
 
 from core.logging.logger import logger
+from core.models.capability import CapabilityPermission, CapabilityVersion
 from core.models.domain import ToolMetadata
 from core.models.tool import ToolExecutionContext, ToolManifest
 from core.tools.base import BaseTool
@@ -76,11 +77,11 @@ class WebSearchTool(BaseTool):
         return ToolManifest(
             name=self.METADATA.name,
             description=self.METADATA.description,
-            version=self.METADATA.version,
+            version=CapabilityVersion(major=1, minor=0, patch=0),
             author=self.METADATA.author,
             capabilities=["web_search"],
-            permissions=self.METADATA.permissions,
-            parameters=self.METADATA.input_schema,
+            permissions=[CapabilityPermission(resource="network", action="read")],
+            entry_point="core.tools.implementations.web_search.WebSearchTool",
         )
 
     async def execute(self, context: ToolExecutionContext, **kwargs: Any) -> str:

@@ -181,7 +181,7 @@ def build_orchestrator(app_settings: Settings | None = None) -> SupervisorOrches
         # ))
     except RuntimeError:
         # No loop running, we can run_until_complete
-        async def load_initial_tools():
+        async def load_initial_tools() -> None:
             await tool_loader.load_tool("core.tools.builtin.echo", "EchoTool")
             await tool_loader.load_tool("core.tools.builtin.calculator", "CalculatorTool")
             await tool_loader.load_tool("core.tools.builtin.file_metadata", "FileMetadataTool")
