@@ -170,7 +170,7 @@ class ReactReasoner:
                 parameters=step.action_input or {},
             )
             # Assuming agent_id could be extracted from somewhere, hardcoding "agent" for now
-            # (or we could pass it down, but the prompt says agents should not know 
+            # (or we could pass it down, but the prompt says agents should not know
             # registries so we use the engine)
             capability_result: CapabilityResult = await self._engine.execute_capability(
                 capability_request, agent_id="react_reasoner"

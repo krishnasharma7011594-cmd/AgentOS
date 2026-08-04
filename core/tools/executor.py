@@ -12,7 +12,7 @@ from core.utils.helpers import generate_uuid
 class CapabilityExecutor:
     """
     Handles execution of a ResolvedCapability.
-    Acquires resource leases, triggers the ToolSandbox, and executes the tool 
+    Acquires resource leases, triggers the ToolSandbox, and executes the tool
     with ToolExecutionContext.
     """
 
