@@ -8,7 +8,7 @@ AgentOS is built as a production-grade modular Agentic AI Operating System follo
 2. **Supervisor Layer** (`supervisor/`): Multi-agent orchestrator broken down into specialized responsibility components (`orchestrator`, `planner`, `router`, `scheduler`, `validator`, `report_generator`, `memory_bridge`).
 3. **Registry Layer** (`registry/`): Dynamic runtime registration and capability indexing (`agent_registry`, `tool_registry`, `capability_registry`).
 4. **Agents Layer** (`agents/`): Domain specialized autonomous agents (`research`, `coding`, `github`, `finance`) following a uniform module template.
-5. **Workflow & Task Queue Layer** (`workflow/`, `task_queue/`): State machines (`Planning`, `Queued`, `Running`, `Waiting`, `Completed`, `Failed`, `Cancelled`) and background workers.
+5. **Workflow & Task Queue Layer** (`workflow/`, `task_queue/`): *(Not Started — Phase 11)* `workflow/` contains enum/type definitions only (no transition logic); `task_queue/` is abstract interface shapes with no real queue backend. Both are contracts for future implementation.
 6. **Core Layer** (`core/`): Foundational AI providers (`core/ai/`), layered memory (`core/memory/`), tool runtime (`core/tools/`), communication bus (`core/communication/`), observability (`observability/`), and evaluation (`evaluation/`).
 7. **Knowledge Layer** (`knowledge/`): Document ingestion, embedding providers, vectorstore interfaces, OKF, and retrieval indexers.
 
