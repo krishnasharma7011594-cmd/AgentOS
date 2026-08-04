@@ -15,7 +15,7 @@ from typing import ClassVar, List, Optional
 from core.ai.providers.base import BaseLLMProvider
 from core.memory.interfaces.base import BaseMemory
 from core.models.domain import AgentMetadata, Capability, ExecutionContext, Task, TaskResult
-from core.tools.registry import ToolRegistry
+from core.tools.engine import CapabilityEngine
 
 
 class BaseAgent(ABC):
@@ -39,7 +39,7 @@ class BaseAgent(ABC):
         description: str,
         llm_provider: Optional[BaseLLMProvider] = None,
         capabilities: Optional[List[Capability]] = None,
-        tool_registry: Optional[ToolRegistry] = None,
+        capability_engine: Optional[CapabilityEngine] = None,
         memory: Optional[BaseMemory] = None,
     ) -> None:
         """
@@ -50,14 +50,14 @@ class BaseAgent(ABC):
             description:   Summary of agent role.
             llm_provider:  Injected BaseLLMProvider instance.
             capabilities:  Declared Capability descriptors.
-            tool_registry: Optional ToolRegistry reference.
+            capability_engine: Optional CapabilityEngine reference.
             memory:        Optional BaseMemory adapter.
         """
         self.name = name
         self.description = description
         self.llm_provider = llm_provider
         self.capabilities: List[Capability] = capabilities or []
-        self.tool_registry = tool_registry
+        self.capability_engine = capability_engine
         self.memory = memory
 
     @abstractmethod

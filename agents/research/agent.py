@@ -30,7 +30,7 @@ from core.models.domain import (
     TaskResult,
 )
 from core.tools.implementations.web_search import WebSearchTool
-from core.tools.registry import ToolRegistry
+from core.tools.engine import CapabilityEngine
 
 
 class ResearchAgent(AgentLifecycle):
@@ -82,14 +82,14 @@ class ResearchAgent(AgentLifecycle):
     def __init__(
         self,
         llm_provider: Optional[BaseLLMProvider] = None,
-        tool_registry: Optional[ToolRegistry] = None,
+        capability_engine: Optional[CapabilityEngine] = None,
     ) -> None:
         super().__init__(
             name="ResearchAgent",
             description="Autonomous agent specialised in web research and summarization.",
             llm_provider=llm_provider,
             capabilities=self.CAPABILITIES,
-            tool_registry=tool_registry,
+            capability_engine=capability_engine,
         )
         logger.info("research_agent_init", agent_id=self.agent_id)
 
@@ -99,15 +99,10 @@ class ResearchAgent(AgentLifecycle):
 
     def _setup_tools(self) -> None:
         """
-        Register the WebSearchTool.
-
-        Called by AgentLifecycle before each ReAct run.
-        Registering on every call is intentional — it is idempotent
-        (ToolRegistry.register overwrites on duplicate names) and makes the
-        agent safe for hot-reload scenarios in Phase 5+.
+        No-op for Phase 10: tools are registered globally via ToolLoader and 
+        resolved via CapabilityEngine.
         """
-        self.tool_registry.register(WebSearchTool())
-        logger.debug("research_agent_tools_registered", agent_id=self.agent_id)
+        pass
 
     def _extra_context(self, context: Optional[ExecutionContext] = None) -> Optional[str]:
         """

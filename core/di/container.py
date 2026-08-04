@@ -41,7 +41,16 @@ from core.parallel.engine import ParallelExecutionEngine
 from core.parallel.scheduler import ExecutionScheduler
 from core.parallel.worker import WorkerPool
 from core.tools.implementations.web_search import WebSearchTool
-from core.tools.registry import ToolRegistry
+from core.tools.capability_registry import CapabilityRegistry as ToolCapRegistry
+from core.tools.tool_registry import ToolRegistry
+from core.tools.loader import ToolLoader
+from core.tools.sandbox import ToolSandbox
+from core.tools.resources import ResourceManager
+from core.tools.permissions import PermissionManager
+from core.tools.resolver import CapabilityResolver
+from core.tools.executor import CapabilityExecutor
+from core.tools.engine import CapabilityEngine
+
 from registry.agent_registry import AgentRegistry
 from registry.capability_registry import CapabilityRegistry
 from supervisor.orchestrator import SupervisorOrchestrator
@@ -55,7 +64,7 @@ from supervisor.worker import SupervisorTaskExecutor
 def _register_agents(
     agent_registry: AgentRegistry,
     capability_registry: CapabilityRegistry,
-    tool_registry: ToolRegistry,
+    capability_engine: CapabilityEngine,
     llm_provider: BaseLLMProvider,
 ) -> None:
     """
@@ -74,7 +83,7 @@ def _register_agents(
     # ResearchAgent
     research_agent = ResearchAgent(
         llm_provider=llm_provider,
-        tool_registry=tool_registry,
+        capability_engine=capability_engine,
     )
     agent_registry.register_agent(research_agent.name, research_agent)
     capability_registry.register_agent_capabilities(
@@ -89,7 +98,7 @@ def _register_agents(
     # CodingAgent
     coding_agent = CodingAgent(
         llm_provider=llm_provider,
-        tool_registry=tool_registry,
+        capability_engine=capability_engine,
     )
     agent_registry.register_agent(coding_agent.name, coding_agent)
     capability_registry.register_agent_capabilities(
@@ -128,13 +137,63 @@ def build_orchestrator(app_settings: Settings | None = None) -> SupervisorOrches
     # 2. Initialize registries
     agent_registry = AgentRegistry()
     capability_registry = CapabilityRegistry()
+    
+    # Tool & Capability Framework (Phase 10)
+    tool_cap_registry = ToolCapRegistry()
     tool_registry = ToolRegistry()
+    
+    resource_manager = ResourceManager()
+    permission_manager = PermissionManager()
+    sandbox = ToolSandbox()
+    
+    tool_loader = ToolLoader(
+        tool_registry=tool_registry,
+        capability_registry=tool_cap_registry
+    )
+    
+    resolver = CapabilityResolver(
+        capability_registry=tool_cap_registry,
+        tool_registry=tool_registry
+    )
+    
+    executor = CapabilityExecutor(
+        tool_registry=tool_registry,
+        sandbox=sandbox,
+        resource_manager=resource_manager
+    )
+    
+    capability_engine = CapabilityEngine(
+        capability_registry=tool_cap_registry,
+        permission_manager=permission_manager,
+        resolver=resolver,
+        executor=executor
+    )
 
-    # Register default tools in global ToolRegistry
-    tool_registry.register(WebSearchTool())
+    import asyncio
+    
+    # Create an event loop if not running to load initial tools (hack for async load in sync DI)
+    # Ideally container should be async, but for DI wiring compat we'll use run_until_complete
+    try:
+        loop = asyncio.get_running_loop()
+        # If loop is running, we schedule it as a task. 
+        # (This implies DI might need an async init step or we block)
+        loop.create_task(tool_loader.load_tool("core.tools.builtin.echo", "EchoTool"))
+        loop.create_task(tool_loader.load_tool("core.tools.builtin.calculator", "CalculatorTool"))
+        loop.create_task(tool_loader.load_tool("core.tools.builtin.file_metadata", "FileMetadataTool"))
+        
+        # Load legacy WebSearchTool for backward compatibility if it's updated
+        # loop.create_task(tool_loader.load_tool("core.tools.implementations.web_search", "WebSearchTool"))
+    except RuntimeError:
+        # No loop running, we can run_until_complete
+        async def load_initial_tools():
+            await tool_loader.load_tool("core.tools.builtin.echo", "EchoTool")
+            await tool_loader.load_tool("core.tools.builtin.calculator", "CalculatorTool")
+            await tool_loader.load_tool("core.tools.builtin.file_metadata", "FileMetadataTool")
+            
+        asyncio.run(load_initial_tools())
 
     # 3. Register active agents (auto-registers metadata from METADATA ClassVar)
-    _register_agents(agent_registry, capability_registry, tool_registry, llm_provider)
+    _register_agents(agent_registry, capability_registry, capability_engine, llm_provider)
 
     # 4. Instantiate supervisor subcomponents
     # Validator receives CapabilityRegistry for plan-level capability checking
@@ -207,7 +266,8 @@ def build_orchestrator(app_settings: Settings | None = None) -> SupervisorOrches
         "DI: AgentOS component graph ready",
         provider=cfg.llm.default_provider,
         agents=agent_registry.list_agents(),
-        capabilities=capability_registry.list_capabilities(),
+        agent_capabilities=capability_registry.list_capabilities(),
         tools=[t.name for t in tool_registry.list_tools()],
+        tool_capabilities=[c.metadata.name for c in tool_cap_registry.list_capabilities()]
     )
     return orchestrator

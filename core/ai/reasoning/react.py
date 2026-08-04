@@ -30,10 +30,9 @@ from core.models.domain import (
     ReasoningStep,
     RoleEnum,
     Task,
-    ToolCall,
-    ToolResult,
 )
-from core.tools.registry import ToolRegistry
+from core.models.capability import CapabilityRequest, CapabilityResult
+from core.tools.engine import CapabilityEngine
 
 # ---------------------------------------------------------------------------
 # Prompt Templates
@@ -71,20 +70,20 @@ class ReactReasoner:
     Stateless ReAct loop executor shared across all AgentOS agents.
 
     Args:
-        llm_provider:  Injected LLM backend (Gemini, Groq, etc.).
-        tool_registry: Injected ToolRegistry with all registered tools.
-        max_steps:     Maximum Think→Act→Observe iterations before forcing a
+        llm_provider:      Injected LLM backend (Gemini, Groq, etc.).
+        capability_engine: Injected CapabilityEngine to resolve tools.
+        max_steps:         Maximum Think→Act→Observe iterations before forcing a
                        final answer from the accumulated context.
     """
 
     def __init__(
         self,
         llm_provider: BaseLLMProvider,
-        tool_registry: ToolRegistry,
+        capability_engine: CapabilityEngine,
         max_steps: int = 3,
     ) -> None:
         self._llm = llm_provider
-        self._registry = tool_registry
+        self._engine = capability_engine
         self._max_steps = max_steps
 
     # ------------------------------------------------------------------
@@ -111,7 +110,7 @@ class ReactReasoner:
         """
         logger.info("react_loop_start", task_id=task.id, max_steps=self._max_steps)
 
-        tool_descriptions = self._registry.get_tool_descriptions()
+        tool_descriptions = self._engine.get_capability_descriptions()
         system_prompt = REACT_SYSTEM_TEMPLATE.format(tool_descriptions=tool_descriptions)
 
         # Conversation history — grows with each iteration
@@ -166,17 +165,19 @@ class ReactReasoner:
                 logger.warning("react_no_action", task_id=task.id, step=step_index)
                 return reasoning_steps, step.thought
 
-            tool_call = ToolCall(
-                tool_name=step.action,
+            capability_request = CapabilityRequest(
+                capability_name=step.action,
                 parameters=step.action_input or {},
             )
-            tool_result: ToolResult = await self._registry.execute(tool_call)
+            # Assuming agent_id could be extracted from somewhere, hardcoding "agent" for now 
+            # (or we could pass it down, but the prompt says agents should not know registries so we use the engine)
+            capability_result: CapabilityResult = await self._engine.execute_capability(capability_request, agent_id="react_reasoner")
 
             # ---- Observe -----------------------------------------------------
-            observation_content = _build_observation_text(tool_result, step_index)
+            observation_content = _build_observation_text(capability_result, step.action, step_index)
             observation = Observation(
                 step=step_index,
-                tool_result=tool_result,
+                capability_result=capability_result,
                 content=observation_content,
             )
 
@@ -194,8 +195,8 @@ class ReactReasoner:
                 "react_observation",
                 task_id=task.id,
                 step=step_index,
-                tool=tool_result.tool_name,
-                success=tool_result.success,
+                capability=step.action,
+                success=capability_result.success,
             )
 
         # ---- Max steps reached — synthesise answer from gathered context -----
@@ -313,20 +314,21 @@ def _safe_json_parse(raw: str) -> Optional[Dict[str, Any]]:
         return {"query": cleaned}
 
 
-def _build_observation_text(result: ToolResult, step: int) -> str:
+def _build_observation_text(result: CapabilityResult, action: str, step: int) -> str:
     """
-    Format a ToolResult into the text injected into the next LLM prompt.
+    Format a CapabilityResult into the text injected into the next LLM prompt.
 
-    Keeps it concise — the full output is available in the ToolResult for
+    Keeps it concise — the full output is available in the CapabilityResult for
     tracing but we only surface what helps the LLM reason next.
     """
     if not result.success:
         return (
-            f"Step {step} — Tool '{result.tool_name}' failed: {result.error}. "
+            f"Step {step} — Action '{action}' failed: {result.error}. "
             "Consider a different approach."
         )
     # Truncate very long outputs to avoid blowing the context window
-    output = result.output
-    if len(output) > 2000:
-        output = output[:2000] + "\n... [output truncated]"
-    return f"Step {step} — Tool '{result.tool_name}' returned:\n{output}"
+    # Make sure output is string
+    output_str = str(result.output)
+    if len(output_str) > 2000:
+        output_str = output_str[:2000] + "\n... [output truncated]"
+    return f"Step {step} — Action '{action}' returned:\n{output_str}"

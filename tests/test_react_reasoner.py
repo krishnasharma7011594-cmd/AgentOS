@@ -11,23 +11,9 @@ from core.ai.reasoning.react import (
     _safe_json_parse,
 )
 from core.models.domain import Task
-from core.tools.base import BaseTool
-from core.tools.registry import ToolRegistry
 from tests.test_llm_provider import MockLLMProvider
-
-
-class DummyTool(BaseTool):
-    """Simple test tool."""
-
-    def __init__(self) -> None:
-        super().__init__(
-            name="dummy_tool",
-            description="A dummy test tool.",
-            parameters={"query": {"type": "string"}},
-        )
-
-    async def execute(self, query: str = "", **kwargs: object) -> str:
-        return f"Dummy output for: {query}"
+from unittest.mock import AsyncMock, MagicMock
+from core.models.capability import CapabilityResult
 
 
 def test_extract_field() -> None:
@@ -64,9 +50,11 @@ def test_safe_json_parse() -> None:
 async def test_react_reasoner_direct_final_answer() -> None:
     llm_output = "Thought: I already know this.\nFinal Answer: AgentOS is awesome."
     provider = MockLLMProvider(llm_output)
-    registry = ToolRegistry()
+    
+    cap_engine = MagicMock()
+    cap_engine.get_capability_descriptions.return_value = "dummy_tool: A dummy test tool."
 
-    reasoner = ReactReasoner(llm_provider=provider, tool_registry=registry, max_steps=3)
+    reasoner = ReactReasoner(llm_provider=provider, capability_engine=cap_engine, max_steps=3)
     task = Task(
         goal_id="g-1",
         name="Test Task",
@@ -106,10 +94,12 @@ async def test_react_reasoner_with_tool_call() -> None:
             return resp
 
     provider = SequenceMockLLMProvider(responses)
-    registry = ToolRegistry()
-    registry.register(DummyTool())
+    
+    cap_engine = MagicMock()
+    cap_engine.get_capability_descriptions.return_value = "dummy_tool: A dummy test tool."
+    cap_engine.execute_capability = AsyncMock(return_value=CapabilityResult(success=True, output="Dummy output for: AgentOS"))
 
-    reasoner = ReactReasoner(llm_provider=provider, tool_registry=registry, max_steps=3)
+    reasoner = ReactReasoner(llm_provider=provider, capability_engine=cap_engine, max_steps=3)
     task = Task(
         goal_id="g-1",
         name="Test Task",

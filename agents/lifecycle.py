@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional
 
 from agents.base import BaseAgent
 from core.ai.providers.base import BaseLLMProvider
+from core.memory.interfaces.base import BaseMemory
 from core.ai.reasoning.react import ReactReasoner
 from core.exceptions.base import LLMProviderError
 from core.logging.logger import logger
@@ -34,7 +35,7 @@ from core.models.domain import (
     TaskResult,
     TaskStatus,
 )
-from core.tools.registry import ToolRegistry
+from core.tools.engine import CapabilityEngine
 from core.utils.helpers import generate_uuid
 
 
@@ -56,21 +57,22 @@ class AgentLifecycle(BaseAgent):
         description: str = "AgentOS lifecycle agent",
         llm_provider: Optional[BaseLLMProvider] = None,
         capabilities: Optional[List[Capability]] = None,
-        tool_registry: Optional[ToolRegistry] = None,
+        capability_engine: Optional[CapabilityEngine] = None,
+        memory: Optional[BaseMemory] = None,
     ) -> None:
         super().__init__(
             name=name,
             description=description,
             llm_provider=llm_provider,
             capabilities=capabilities,
-            # Pass an empty registry to BaseAgent; we manage it ourselves below
-            tool_registry=None,
+            capability_engine=capability_engine,
+            memory=memory,
         )
 
-        # The tool registry is either injected (production, DI container) or
-        # created fresh (unit tests that don't need real tools).
-        # We override the one set by BaseAgent so we always have a non-None ref.
-        self.tool_registry: ToolRegistry = tool_registry or ToolRegistry()
+        # We override the one set by BaseAgent so we always have a non-None ref if needed.
+        # But for CapabilityEngine, we usually rely on DI. If none is provided we shouldn't
+        # instantiate it since it requires DI. (Wait, let's leave it as None if not provided)
+        self.capability_engine = capability_engine
 
         # Unique agent instance ID for tracing
         self.agent_id: str = f"{name}-{generate_uuid()[:8]}"
@@ -100,10 +102,10 @@ class AgentLifecycle(BaseAgent):
     @abstractmethod
     def _setup_tools(self) -> None:
         """
-        Register this agent's tools into self.tool_registry.
-
+        Setup any agent-specific configuration or tools before execution.
         Called exactly once during execute_task() before the ReAct loop starts.
-        Subclasses should call self.tool_registry.register(SomeTool()) here.
+        With CapabilityEngine, tools are typically registered globally via ToolLoader,
+        so this can just be a no-op or used for agent-specific state.
         """
         ...
 
@@ -147,18 +149,21 @@ class AgentLifecycle(BaseAgent):
         )
 
         try:
-            # Step 1: populate tool registry
+            # Step 1: setup any agent state
             self._setup_tools()
 
-            # Step 2: build reasoner (rebuilt on each call; tool_registry is shared)
+            # Step 2: build reasoner
             if self.llm_provider is None:
                 raise LLMProviderError(
                     "No LLM provider configured. Inject one via DI or constructor."
                 )
 
+            if self.capability_engine is None:
+                raise ValueError("CapabilityEngine not provided to AgentLifecycle")
+
             self._reasoner = ReactReasoner(
                 llm_provider=self.llm_provider,
-                tool_registry=self.tool_registry,
+                capability_engine=self.capability_engine,
                 max_steps=self._max_react_steps(),
             )
 

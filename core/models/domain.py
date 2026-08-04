@@ -727,12 +727,12 @@ class Observation(BaseModel):
 
     Attributes:
         step:        Index of the reasoning loop iteration (1-based).
-        tool_result: Underlying ToolResult from the registry.
+        capability_result: Underlying CapabilityResult from the engine.
         content:     Human-readable summary injected into the next prompt.
     """
 
     step: int = Field(..., description="Reasoning loop iteration (1-based)")
-    tool_result: ToolResult
+    capability_result: Any = Field(..., description="The capability execution result")
     content: str = Field(..., description="Observation text injected into next reasoning prompt")
 
 

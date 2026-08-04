@@ -5,6 +5,7 @@ from typing import ClassVar, List, Optional
 from agents.coding.prompts_v1 import CAPABILITY_TEMPLATES, SYSTEM_CONTEXT
 from agents.lifecycle import AgentLifecycle
 from core.ai.providers.base import BaseLLMProvider
+from core.memory.interfaces.base import BaseMemory
 from core.logging.logger import logger
 from core.models.domain import (
     AgentMetadata,
@@ -13,7 +14,7 @@ from core.models.domain import (
     Task,
     TaskResult,
 )
-from core.tools.registry import ToolRegistry
+from core.tools.engine import CapabilityEngine
 
 
 class CodingAgent(AgentLifecycle):
@@ -60,7 +61,8 @@ class CodingAgent(AgentLifecycle):
     def __init__(
         self,
         llm_provider: Optional[BaseLLMProvider] = None,
-        tool_registry: Optional[ToolRegistry] = None,
+        capability_engine: Optional[CapabilityEngine] = None,
+        memory: Optional[BaseMemory] = None,
     ) -> None:
         super().__init__(
             name="CodingAgent",
@@ -69,7 +71,8 @@ class CodingAgent(AgentLifecycle):
             ),
             llm_provider=llm_provider,
             capabilities=self.CAPABILITIES,
-            tool_registry=tool_registry,
+            capability_engine=capability_engine,
+            memory=memory,
         )
         logger.info("coding_agent_init", agent_id=self.agent_id)
 

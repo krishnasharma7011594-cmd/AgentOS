@@ -1,11 +1,11 @@
 """Base tool interface for AgentOS."""
 
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Dict, Optional
+from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
-from core.models.domain import ToolMetadata
+from core.models.tool import ToolManifest, ToolHealth, ToolExecutionContext
 
 
 class ToolSchema(BaseModel):
@@ -27,37 +27,48 @@ class BaseTool(ABC):
     Abstract Base Tool interface implemented by all AgentOS tools.
 
     Every concrete tool must:
-      - Declare a class-level METADATA: ClassVar[ToolMetadata] object.
-      - Implement the async execute(**kwargs) method.
-
-    The METADATA object makes ToolRegistry metadata-driven so callers can
-    inspect tool capabilities without instantiating the tool class.
+      - Implement `get_manifest()` to expose its ToolManifest.
+      - Implement the async lifecycle hooks.
     """
 
-    # Subclasses override this with their rich ToolMetadata descriptor.
-    METADATA: ClassVar[ToolMetadata]
+    def __init__(self) -> None:
+        self.schema: Optional[ToolSchema] = None
 
-    def __init__(
-        self,
-        name: str,
-        description: str,
-        parameters: Optional[Dict[str, Any]] = None,
-    ) -> None:
-        self.schema = ToolSchema(
-            name=name,
-            description=description,
-            parameters=parameters or {},
-        )
+    @abstractmethod
+    def get_manifest(self) -> ToolManifest:
+        """Return the manifest describing this tool."""
+        pass
 
     @property
     def name(self) -> str:
-        return self.schema.name
+        return self.get_manifest().name
 
     @property
     def description(self) -> str:
-        return self.schema.description
+        return self.get_manifest().description
+
+    # ------------------------------------------------------------------
+    # Lifecycle Hooks
+    # ------------------------------------------------------------------
+
+    async def initialize(self) -> None:
+        """Called once when the tool is loaded into the registry."""
+        pass
+
+    async def health_check(self) -> ToolHealth:
+        """Return the current health status of the tool."""
+        from core.models.tool import ToolHealth
+        return ToolHealth(status="HEALTHY")
 
     @abstractmethod
-    async def execute(self, **kwargs: Any) -> Any:
-        """Execute tool logic given key-value parameters."""
+    async def execute(self, context: ToolExecutionContext, **kwargs: Any) -> Any:
+        """Execute tool logic given key-value parameters and a context."""
+        pass
+
+    async def cleanup(self) -> None:
+        """Called after an execution completes, whether successful or not."""
+        pass
+
+    async def shutdown(self) -> None:
+        """Called when the tool is unloaded or the system shuts down."""
         pass

@@ -17,6 +17,7 @@ from typing import Any, ClassVar, List
 
 from core.logging.logger import logger
 from core.models.domain import ToolMetadata
+from core.models.tool import ToolManifest, ToolExecutionContext
 from core.tools.base import BaseTool
 
 
@@ -68,27 +69,21 @@ class WebSearchTool(BaseTool):
     MAX_ALLOWED_RESULTS: int = 8
 
     def __init__(self) -> None:
-        super().__init__(
-            name="web_search",
-            description=(
-                "Search the web for current information about a topic. "
-                "Use this when you need facts, news, or data you might not have."
-            ),
-            parameters={
-                "query": {
-                    "type": "string",
-                    "description": "The search query to send to DuckDuckGo.",
-                    "required": True,
-                },
-                "max_results": {
-                    "type": "integer",
-                    "description": "Number of results to return (default: 3, max: 8).",
-                    "required": False,
-                },
-            },
+        super().__init__()
+
+    def get_manifest(self) -> ToolManifest:
+        """Return the manifest describing this tool."""
+        return ToolManifest(
+            name=self.METADATA.name,
+            description=self.METADATA.description,
+            version=self.METADATA.version,
+            author=self.METADATA.author,
+            capabilities=["web_search"],
+            permissions=self.METADATA.permissions,
+            parameters=self.METADATA.input_schema,
         )
 
-    async def execute(self, **kwargs: Any) -> str:
+    async def execute(self, context: ToolExecutionContext, **kwargs: Any) -> str:
         """
         Perform a DuckDuckGo text search and return a formatted result string.
 
