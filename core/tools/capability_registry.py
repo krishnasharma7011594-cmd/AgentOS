@@ -1,7 +1,8 @@
 from typing import Dict, List, Optional
-from core.models.capability import CapabilityDescriptor, CapabilityVersion
+
 from core.exceptions.base import CapabilityNotFoundError
 from core.logging.logger import logger
+from core.models.capability import CapabilityDescriptor
 
 
 class CapabilityRegistry:
@@ -21,7 +22,7 @@ class CapabilityRegistry:
         logger.info(
             "capability_registered",
             name=descriptor.metadata.name,
-            version=str(descriptor.metadata.version)
+            version=str(descriptor.metadata.version),
         )
 
     def unregister(self, name: str) -> None:

@@ -24,6 +24,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from core.ai.providers.base import BaseLLMProvider
 from core.logging.logger import logger
+from core.models.capability import CapabilityRequest, CapabilityResult
 from core.models.domain import (
     Message,
     Observation,
@@ -31,7 +32,6 @@ from core.models.domain import (
     RoleEnum,
     Task,
 )
-from core.models.capability import CapabilityRequest, CapabilityResult
 from core.tools.engine import CapabilityEngine
 
 # ---------------------------------------------------------------------------
@@ -169,12 +169,17 @@ class ReactReasoner:
                 capability_name=step.action,
                 parameters=step.action_input or {},
             )
-            # Assuming agent_id could be extracted from somewhere, hardcoding "agent" for now 
-            # (or we could pass it down, but the prompt says agents should not know registries so we use the engine)
-            capability_result: CapabilityResult = await self._engine.execute_capability(capability_request, agent_id="react_reasoner")
+            # Assuming agent_id could be extracted from somewhere, hardcoding "agent" for now
+            # (or we could pass it down, but the prompt says agents should not know 
+            # registries so we use the engine)
+            capability_result: CapabilityResult = await self._engine.execute_capability(
+                capability_request, agent_id="react_reasoner"
+            )
 
             # ---- Observe -----------------------------------------------------
-            observation_content = _build_observation_text(capability_result, step.action, step_index)
+            observation_content = _build_observation_text(
+                capability_result, step.action, step_index
+            )
             observation = Observation(
                 step=step_index,
                 capability_result=capability_result,

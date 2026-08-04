@@ -23,10 +23,10 @@ from typing import Any, Dict, List, Optional
 
 from agents.base import BaseAgent
 from core.ai.providers.base import BaseLLMProvider
-from core.memory.interfaces.base import BaseMemory
 from core.ai.reasoning.react import ReactReasoner
 from core.exceptions.base import LLMProviderError
 from core.logging.logger import logger
+from core.memory.interfaces.base import BaseMemory
 from core.models.domain import (
     Capability,
     ExecutionContext,

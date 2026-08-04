@@ -1,18 +1,20 @@
 import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
 
 from core.models.capability import (
-    CapabilityVersion,
     CapabilityPermission,
     CapabilityRequest,
+    CapabilityVersion,
     ResolvedCapability,
 )
 
 
 class ToolCategory(str, Enum):
     """Broad categories for tools to aid in discovery and organization."""
+
     SYSTEM = "SYSTEM"
     BROWSER = "BROWSER"
     FILESYSTEM = "FILESYSTEM"
@@ -29,8 +31,11 @@ class ToolCategory(str, Enum):
 
 class ToolHealth(BaseModel):
     """Health metadata for a tool."""
+
     status: str = Field(default="UNKNOWN", description="e.g., HEALTHY, DEGRADED, UNHEALTHY")
-    availability: float = Field(default=1.0, description="0.0 to 1.0 indicating uptime/availability")
+    availability: float = Field(
+        default=1.0, description="0.0 to 1.0 indicating uptime/availability"
+    )
     latency_ms: Optional[int] = None
     last_error: Optional[str] = None
     last_checked: Optional[datetime.datetime] = None
@@ -39,6 +44,7 @@ class ToolHealth(BaseModel):
 
 class ToolManifest(BaseModel):
     """Discoverable metadata for a tool plugin."""
+
     name: str
     version: CapabilityVersion
     description: str
@@ -53,6 +59,7 @@ class ToolManifest(BaseModel):
 
 class ResourceLease(BaseModel):
     """A lease object representing a granted resource."""
+
     lease_id: str
     resource_name: str
     granted_at: datetime.datetime = Field(default_factory=datetime.datetime.utcnow)
@@ -62,6 +69,7 @@ class ResourceLease(BaseModel):
 
 class ToolExecutionContext(BaseModel):
     """Structured context passed to a tool during execution."""
+
     execution_id: str
     request: CapabilityRequest
     capability: ResolvedCapability

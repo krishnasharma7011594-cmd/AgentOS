@@ -1,9 +1,12 @@
 from enum import Enum
 from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
+
 
 class CapabilityScope(str, Enum):
     """Defines the operating scope of a capability."""
+
     GLOBAL = "GLOBAL"
     LOCAL = "LOCAL"
     SESSION = "SESSION"
@@ -11,6 +14,7 @@ class CapabilityScope(str, Enum):
 
 class CapabilityVersion(BaseModel):
     """Semantic versioning model for capabilities."""
+
     major: int
     minor: int
     patch: int
@@ -31,6 +35,7 @@ class CapabilityVersion(BaseModel):
 
 class CapabilityMetadata(BaseModel):
     """Metadata describing a capability."""
+
     name: str = Field(..., description="Unique name of the capability")
     version: CapabilityVersion = Field(..., description="Version of the capability")
     description: str = Field(..., description="Human readable explanation")
@@ -39,7 +44,10 @@ class CapabilityMetadata(BaseModel):
 
 class CapabilityPermission(BaseModel):
     """Describes a required permission to execute a capability."""
-    resource: str = Field(..., description="The resource being accessed (e.g., filesystem, network)")
+
+    resource: str = Field(
+        ..., description="The resource being accessed (e.g., filesystem, network)"
+    )
     action: str = Field(..., description="The action being performed (e.g., read, write)")
 
     def __str__(self) -> str:
@@ -48,12 +56,14 @@ class CapabilityPermission(BaseModel):
 
 class CapabilityDependency(BaseModel):
     """Describes a dependency on another capability."""
+
     capability_name: str
     minimum_version: Optional[CapabilityVersion] = None
 
 
 class CapabilityPolicy(BaseModel):
     """Constraints on the capability."""
+
     rate_limit_per_minute: Optional[int] = None
     timeout_ms: Optional[int] = None
     max_concurrent_executions: Optional[int] = None
@@ -61,6 +71,7 @@ class CapabilityPolicy(BaseModel):
 
 class CapabilityDescriptor(BaseModel):
     """Full definition of an available capability."""
+
     metadata: CapabilityMetadata
     scope: CapabilityScope = CapabilityScope.LOCAL
     permissions: List[CapabilityPermission] = Field(default_factory=list)
@@ -70,6 +81,7 @@ class CapabilityDescriptor(BaseModel):
 
 class CapabilityRequest(BaseModel):
     """Request from an agent to execute a capability."""
+
     capability_name: str
     parameters: Dict[str, Any] = Field(default_factory=dict)
     preferred_version: Optional[CapabilityVersion] = None
@@ -79,6 +91,7 @@ class CapabilityRequest(BaseModel):
 
 class ResolvedCapability(BaseModel):
     """Output from CapabilityEngine indicating the resolved tool implementation."""
+
     request: CapabilityRequest
     descriptor: CapabilityDescriptor
     tool_name: str
@@ -87,6 +100,7 @@ class ResolvedCapability(BaseModel):
 
 class CapabilityResult(BaseModel):
     """Standardized result wrapper for capability execution."""
+
     success: bool
     output: Any = None
     error: Optional[str] = None

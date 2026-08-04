@@ -17,7 +17,7 @@ from typing import Any, ClassVar, List
 
 from core.logging.logger import logger
 from core.models.domain import ToolMetadata
-from core.models.tool import ToolManifest, ToolExecutionContext
+from core.models.tool import ToolExecutionContext, ToolManifest
 from core.tools.base import BaseTool
 
 

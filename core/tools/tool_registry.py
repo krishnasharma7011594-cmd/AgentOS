@@ -1,8 +1,9 @@
 from typing import Dict, List, Optional
-from core.tools.base import BaseTool
-from core.models.tool import ToolHealth
+
 from core.exceptions.base import ToolNotFoundError
 from core.logging.logger import logger
+from core.models.tool import ToolHealth
+from core.tools.base import BaseTool
 
 
 class ToolRegistry:
@@ -23,11 +24,7 @@ class ToolRegistry:
         self._tools[manifest.name] = tool
         # Default health to UNKNOWN upon registration
         self._health_status[manifest.name] = ToolHealth(status="UNKNOWN")
-        logger.info(
-            "tool_registered",
-            name=manifest.name,
-            version=str(manifest.version)
-        )
+        logger.info("tool_registered", name=manifest.name, version=str(manifest.version))
 
     def unregister(self, name: str) -> None:
         """Remove a tool from the registry."""

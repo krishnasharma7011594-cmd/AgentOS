@@ -1,10 +1,12 @@
 import importlib
 from typing import List
-from core.tools.base import BaseTool
-from core.tools.tool_registry import ToolRegistry
-from core.tools.capability_registry import CapabilityRegistry
-from core.models.capability import CapabilityDescriptor, CapabilityMetadata, CapabilityScope
+
 from core.logging.logger import logger
+from core.models.capability import CapabilityDescriptor, CapabilityMetadata, CapabilityScope
+from core.tools.base import BaseTool
+from core.tools.capability_registry import CapabilityRegistry
+from core.tools.tool_registry import ToolRegistry
+
 
 class ToolLoader:
     """
@@ -13,9 +15,7 @@ class ToolLoader:
     """
 
     def __init__(
-        self,
-        tool_registry: ToolRegistry,
-        capability_registry: CapabilityRegistry
+        self, tool_registry: ToolRegistry, capability_registry: CapabilityRegistry
     ) -> None:
         self._tool_registry = tool_registry
         self._capability_registry = capability_registry
@@ -49,14 +49,14 @@ class ToolLoader:
                         name=cap_name,
                         version=manifest.version,
                         description=f"Provides {cap_name} functionality.",
-                        author=manifest.author
+                        author=manifest.author,
                     ),
                     scope=CapabilityScope.LOCAL,
                     permissions=manifest.permissions,
                     # For simplicity, passing manifest dependencies to the capability
                 )
                 self._capability_registry.register(desc)
-            
+
             logger.info("tool_loaded", module=module_path, class_name=class_name)
 
         except Exception as e:
@@ -69,9 +69,9 @@ class ToolLoader:
         if tool:
             await tool.shutdown()
             self._tool_registry.unregister(name)
-            
+
             # Remove capabilities only provided by this tool
-            # (Simplified: in a robust system with multiple implementations, 
+            # (Simplified: in a robust system with multiple implementations,
             # we'd check if other tools still provide it).
             for cap in tool.get_manifest().capabilities:
                 self._capability_registry.unregister(cap)
@@ -82,6 +82,7 @@ class ToolLoader:
         # Force reload module
         if module_path in self._loaded_modules:
             import sys
+
             if module_path in sys.modules:
                 importlib.reload(sys.modules[module_path])
         await self.load_tool(module_path, class_name)

@@ -1,12 +1,12 @@
 from typing import Any
+
+from core.logging.logger import logger
 from core.models.capability import CapabilityRequest, CapabilityResult
-from core.tools.resolver import CapabilityResolver
+from core.tools.capability_registry import CapabilityRegistry
 from core.tools.executor import CapabilityExecutor
 from core.tools.permissions import PermissionManager
-from core.logging.logger import logger
+from core.tools.resolver import CapabilityResolver
 
-
-from core.tools.capability_registry import CapabilityRegistry
 
 class CapabilityEngine:
     """
@@ -20,7 +20,7 @@ class CapabilityEngine:
         capability_registry: CapabilityRegistry,
         permission_manager: PermissionManager,
         resolver: CapabilityResolver,
-        executor: CapabilityExecutor
+        executor: CapabilityExecutor,
     ) -> None:
         self._capability_registry = capability_registry
         self._permission_manager = permission_manager
@@ -32,15 +32,13 @@ class CapabilityEngine:
         request: CapabilityRequest,
         agent_id: str = "system",
         supervisor_id: str = "system",
-        cancellation_token: Any = None
+        cancellation_token: Any = None,
     ) -> CapabilityResult:
         """
         Handle the full lifecycle of a capability request from an agent.
         """
         logger.info(
-            "capability_engine_received_request",
-            capability=request.capability_name,
-            agent=agent_id
+            "capability_engine_received_request", capability=request.capability_name, agent=agent_id
         )
 
         try:
@@ -49,8 +47,7 @@ class CapabilityEngine:
 
             # 2. Validate permissions
             self._permission_manager.validate_permissions(
-                agent_id=agent_id,
-                required_permissions=resolved_cap.descriptor.permissions
+                agent_id=agent_id, required_permissions=resolved_cap.descriptor.permissions
             )
 
             # 3. Delegate to executor
@@ -58,20 +55,15 @@ class CapabilityEngine:
                 resolved_cap=resolved_cap,
                 agent_id=agent_id,
                 supervisor_id=supervisor_id,
-                cancellation_token=cancellation_token
+                cancellation_token=cancellation_token,
             )
             return result
 
         except Exception as e:
             logger.error(
-                "capability_engine_error",
-                capability=request.capability_name,
-                error=str(e)
+                "capability_engine_error", capability=request.capability_name, error=str(e)
             )
-            return CapabilityResult(
-                success=False,
-                error=str(e)
-            )
+            return CapabilityResult(success=False, error=str(e))
 
     def get_capability_descriptions(self) -> str:
         """
@@ -88,5 +80,5 @@ class CapabilityEngine:
             # Note: For full parameter descriptions we'd need parameters schema on the capability.
             # In a robust system, the capability metadata would hold a JSON schema for parameters.
             # For simplicity, we just output the name and description.
-            
+
         return "\n".join(lines)

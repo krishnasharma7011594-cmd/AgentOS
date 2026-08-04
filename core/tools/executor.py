@@ -1,24 +1,23 @@
 from typing import Any
-from core.models.capability import CapabilityResult, ResolvedCapability
-from core.models.tool import ToolExecutionContext, ResourceLease
-from core.tools.tool_registry import ToolRegistry
-from core.tools.sandbox import ToolSandbox
-from core.tools.resources import ResourceManager
+
 from core.logging.logger import logger
+from core.models.capability import CapabilityResult, ResolvedCapability
+from core.models.tool import ToolExecutionContext
+from core.tools.resources import ResourceManager
+from core.tools.sandbox import ToolSandbox
+from core.tools.tool_registry import ToolRegistry
 from core.utils.helpers import generate_uuid
 
 
 class CapabilityExecutor:
     """
     Handles execution of a ResolvedCapability.
-    Acquires resource leases, triggers the ToolSandbox, and executes the tool with ToolExecutionContext.
+    Acquires resource leases, triggers the ToolSandbox, and executes the tool 
+    with ToolExecutionContext.
     """
 
     def __init__(
-        self,
-        tool_registry: ToolRegistry,
-        sandbox: ToolSandbox,
-        resource_manager: ResourceManager
+        self, tool_registry: ToolRegistry, sandbox: ToolSandbox, resource_manager: ResourceManager
     ) -> None:
         self._tool_registry = tool_registry
         self._sandbox = sandbox
@@ -42,7 +41,7 @@ class CapabilityExecutor:
             "capability_executor_start",
             execution_id=execution_id,
             capability=resolved_cap.request.capability_name,
-            tool=manifest.name
+            tool=manifest.name,
         )
 
         acquired_leases = []
@@ -55,11 +54,9 @@ class CapabilityExecutor:
                     duration = int(resolved_cap.descriptor.policy.timeout_ms / 1000)
                 else:
                     duration = 300
-                
+
                 lease = self._resource_manager.acquire_lease(
-                    resource_name=resource_name,
-                    owner_id=execution_id,
-                    duration_sec=duration
+                    resource_name=resource_name, owner_id=execution_id, duration_sec=duration
                 )
                 acquired_leases.append(lease)
 
@@ -72,14 +69,12 @@ class CapabilityExecutor:
                 resource_leases=acquired_leases,
                 cancellation_token=cancellation_token,
                 agent_id=agent_id,
-                supervisor_id=supervisor_id
+                supervisor_id=supervisor_id,
             )
 
             # 3. Execute in Sandbox
             raw_output = await self._sandbox.execute_in_sandbox(
-                context=context,
-                execute_fn=tool.execute,
-                **resolved_cap.request.parameters
+                context=context, execute_fn=tool.execute, **resolved_cap.request.parameters
             )
 
             # Convert non-string outputs safely or just store as Any
@@ -91,13 +86,11 @@ class CapabilityExecutor:
             logger.info(
                 "capability_executor_success",
                 execution_id=execution_id,
-                capability=resolved_cap.request.capability_name
+                capability=resolved_cap.request.capability_name,
             )
 
             return CapabilityResult(
-                success=True,
-                output=output,
-                metadata=context.execution_metadata
+                success=True, output=output, metadata=context.execution_metadata
             )
 
         except Exception as e:
@@ -105,20 +98,16 @@ class CapabilityExecutor:
                 "capability_executor_error",
                 execution_id=execution_id,
                 capability=resolved_cap.request.capability_name,
-                error=str(e)
+                error=str(e),
             )
-            
+
             # Still attempt cleanup on failure
             try:
                 await tool.cleanup()
             except Exception as cleanup_err:
                 logger.error("tool_cleanup_failed", error=str(cleanup_err))
 
-            return CapabilityResult(
-                success=False,
-                error=str(e),
-                metadata={}
-            )
+            return CapabilityResult(success=False, error=str(e), metadata={})
         finally:
             # 5. Always release leases
             for lease in acquired_leases:

@@ -1,7 +1,8 @@
 from typing import Any
-from core.tools.base import BaseTool
-from core.models.tool import ToolManifest, ToolCategory, ToolExecutionContext
+
 from core.models.capability import CapabilityVersion
+from core.models.tool import ToolCategory, ToolExecutionContext, ToolManifest
+from core.tools.base import BaseTool
 
 
 class EchoTool(BaseTool):
@@ -14,7 +15,7 @@ class EchoTool(BaseTool):
             description="Echoes the provided message.",
             capabilities=["echo"],
             category=ToolCategory.MOCK,
-            entry_point="core.tools.builtin.echo.EchoTool"
+            entry_point="core.tools.builtin.echo.EchoTool",
         )
 
     async def execute(self, context: ToolExecutionContext, **kwargs: Any) -> Any:

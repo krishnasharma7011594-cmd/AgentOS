@@ -29,7 +29,6 @@ from core.models.domain import (
     Task,
     TaskResult,
 )
-from core.tools.implementations.web_search import WebSearchTool
 from core.tools.engine import CapabilityEngine
 
 
@@ -99,7 +98,7 @@ class ResearchAgent(AgentLifecycle):
 
     def _setup_tools(self) -> None:
         """
-        No-op for Phase 10: tools are registered globally via ToolLoader and 
+        No-op for Phase 10: tools are registered globally via ToolLoader and
         resolved via CapabilityEngine.
         """
         pass

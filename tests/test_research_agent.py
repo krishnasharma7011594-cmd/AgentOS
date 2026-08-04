@@ -4,16 +4,16 @@ import pytest
 
 from agents.research.agent import ResearchAgent
 from core.models.domain import Task, TaskStatus
-from core.utils.helpers import generate_uuid
-from tests.test_llm_provider import MockLLMProvider
 from core.tools.engine import CapabilityEngine
-from registry.capability_registry import CapabilityRegistry
+from core.tools.executor import CapabilityExecutor
 from core.tools.permissions import PermissionManager
 from core.tools.resolver import CapabilityResolver
-from core.tools.executor import CapabilityExecutor
-from core.tools.sandbox import ToolSandbox
 from core.tools.resources import ResourceManager
+from core.tools.sandbox import ToolSandbox
 from core.tools.tool_registry import ToolRegistry
+from core.utils.helpers import generate_uuid
+from registry.capability_registry import CapabilityRegistry
+from tests.test_llm_provider import MockLLMProvider
 
 
 @pytest.mark.asyncio
@@ -48,6 +48,7 @@ async def test_research_agent_execution_with_react() -> None:
     assert "LangGraph" in result.summary
     assert "reasoning_steps" in result.metadata
     assert result.metadata["total_steps"] == 1
+
 
 @pytest.mark.asyncio
 async def test_research_agent_missing_provider() -> None:

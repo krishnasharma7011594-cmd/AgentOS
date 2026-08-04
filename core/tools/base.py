@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
 
-from core.models.tool import ToolManifest, ToolHealth, ToolExecutionContext
+from core.models.tool import ToolExecutionContext, ToolHealth, ToolManifest
 
 
 class ToolSchema(BaseModel):
@@ -53,11 +53,12 @@ class BaseTool(ABC):
 
     async def initialize(self) -> None:
         """Called once when the tool is loaded into the registry."""
-        pass
+        return None
 
     async def health_check(self) -> ToolHealth:
         """Return the current health status of the tool."""
         from core.models.tool import ToolHealth
+
         return ToolHealth(status="HEALTHY")
 
     @abstractmethod
@@ -67,8 +68,8 @@ class BaseTool(ABC):
 
     async def cleanup(self) -> None:
         """Called after an execution completes, whether successful or not."""
-        pass
+        return None
 
     async def shutdown(self) -> None:
         """Called when the tool is unloaded or the system shuts down."""
-        pass
+        return None

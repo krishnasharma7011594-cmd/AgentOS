@@ -5,8 +5,8 @@ from typing import ClassVar, List, Optional
 from agents.coding.prompts_v1 import CAPABILITY_TEMPLATES, SYSTEM_CONTEXT
 from agents.lifecycle import AgentLifecycle
 from core.ai.providers.base import BaseLLMProvider
-from core.memory.interfaces.base import BaseMemory
 from core.logging.logger import logger
+from core.memory.interfaces.base import BaseMemory
 from core.models.domain import (
     AgentMetadata,
     Capability,

@@ -1,16 +1,18 @@
 from typing import List, Set
-from core.models.capability import CapabilityPermission
+
 from core.logging.logger import logger
+from core.models.capability import CapabilityPermission
 
 
 class PermissionDeniedError(Exception):
     """Raised when an agent lacks required permissions."""
+
     pass
 
 
 class PermissionManager:
     """
-    Validates if the current agent/context holds the permissions required 
+    Validates if the current agent/context holds the permissions required
     to execute a capability.
     """
 
@@ -31,7 +33,9 @@ class PermissionManager:
             self._granted_permissions[agent_id].discard(str(permission))
             logger.info("permission_revoked", agent=agent_id, permission=str(permission))
 
-    def validate_permissions(self, agent_id: str, required_permissions: List[CapabilityPermission]) -> None:
+    def validate_permissions(
+        self, agent_id: str, required_permissions: List[CapabilityPermission]
+    ) -> None:
         """
         Validate that the agent has all required permissions.
         Raises PermissionDeniedError if any are missing.
@@ -42,11 +46,9 @@ class PermissionManager:
         granted = self._granted_permissions.get(agent_id, set())
         for req in required_permissions:
             if str(req) not in granted:
-                logger.error(
-                    "permission_denied",
-                    agent=agent_id,
-                    missing=str(req)
-                )
+                logger.error("permission_denied", agent=agent_id, missing=str(req))
                 raise PermissionDeniedError(f"Agent {agent_id} lacks permission: {req}")
-        
-        logger.debug("permissions_validated", agent=agent_id, required=[str(p) for p in required_permissions])
+
+        logger.debug(
+            "permissions_validated", agent=agent_id, required=[str(p) for p in required_permissions]
+        )

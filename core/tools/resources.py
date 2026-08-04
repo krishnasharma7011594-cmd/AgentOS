@@ -1,11 +1,14 @@
 import datetime
 from typing import Dict, List, Optional
-from core.models.tool import ResourceLease
+
 from core.logging.logger import logger
+from core.models.tool import ResourceLease
 from core.utils.helpers import generate_uuid
+
 
 class ResourceConflictError(Exception):
     """Raised when a resource cannot be leased due to conflicts."""
+
     pass
 
 
@@ -19,7 +22,9 @@ class ResourceManager:
         # map: resource_name -> current active lease
         self._active_leases: Dict[str, ResourceLease] = {}
 
-    def acquire_lease(self, resource_name: str, owner_id: str, duration_sec: Optional[int] = None) -> ResourceLease:
+    def acquire_lease(
+        self, resource_name: str, owner_id: str, duration_sec: Optional[int] = None
+    ) -> ResourceLease:
         """
         Attempt to acquire a lease for a resource.
         """
@@ -32,9 +37,11 @@ class ResourceManager:
                 "resource_conflict",
                 resource=resource_name,
                 requested_by=owner_id,
-                owned_by=current_lease.owner_id
+                owned_by=current_lease.owner_id,
             )
-            raise ResourceConflictError(f"Resource '{resource_name}' is currently leased by {current_lease.owner_id}.")
+            raise ResourceConflictError(
+                f"Resource '{resource_name}' is currently leased by {current_lease.owner_id}."
+            )
 
         now = datetime.datetime.utcnow()
         expires_at = now + datetime.timedelta(seconds=duration_sec) if duration_sec else None
@@ -44,11 +51,13 @@ class ResourceManager:
             resource_name=resource_name,
             granted_at=now,
             expires_at=expires_at,
-            owner_id=owner_id
+            owner_id=owner_id,
         )
         self._active_leases[resource_name] = lease
 
-        logger.info("lease_acquired", resource=resource_name, owner=owner_id, lease_id=lease.lease_id)
+        logger.info(
+            "lease_acquired", resource=resource_name, owner=owner_id, lease_id=lease.lease_id
+        )
         return lease
 
     def release_lease(self, lease: ResourceLease) -> None:
@@ -59,7 +68,9 @@ class ResourceManager:
                 del self._active_leases[lease.resource_name]
                 logger.info("lease_released", resource=lease.resource_name, lease_id=lease.lease_id)
             else:
-                logger.warning("lease_release_mismatch", resource=lease.resource_name, attempted=lease.lease_id)
+                logger.warning(
+                    "lease_release_mismatch", resource=lease.resource_name, attempted=lease.lease_id
+                )
 
     def _cleanup_expired(self) -> None:
         """Remove leases that have expired."""
@@ -68,9 +79,11 @@ class ResourceManager:
         for res_name, lease in self._active_leases.items():
             if lease.expires_at and lease.expires_at < now:
                 expired.append(res_name)
-        
+
         for res_name in expired:
-            logger.info("lease_expired", resource=res_name, lease_id=self._active_leases[res_name].lease_id)
+            logger.info(
+                "lease_expired", resource=res_name, lease_id=self._active_leases[res_name].lease_id
+            )
             del self._active_leases[res_name]
 
     def get_active_leases(self) -> List[ResourceLease]:
